@@ -1,7 +1,7 @@
 const BASE_URL = "http://localhost:8000";
 
 export const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  const token = localStorage.getItem("access_token");
+  const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null;
   
   const headers = new Headers(options.headers || {});
   if (token) {

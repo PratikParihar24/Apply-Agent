@@ -29,6 +29,26 @@ function HuntPageWrapper() {
   );
 }
 
+function ShimmerCard({ index }: { index: number }) {
+  return (
+    <div
+      style={{ animation: "var(--animate-slide-in)", animationDelay: `${index * 150}ms` }}
+      className="rounded-card border border-cardborder bg-cardbg p-4 space-y-3"
+    >
+      <div className="flex items-center justify-between">
+        <div className="shimmer-bg h-4 w-1/2 rounded" />
+        <div className="shimmer-bg h-4 w-1/4 rounded" />
+      </div>
+      <div className="shimmer-bg h-3 w-full rounded" />
+      <div className="shimmer-bg h-3 w-5/6 rounded" />
+      <div className="flex gap-2 pt-2">
+        <div className="shimmer-bg h-8 flex-1 rounded" />
+        <div className="shimmer-bg h-8 w-12 rounded" />
+      </div>
+    </div>
+  );
+}
+
 
 type Status = "searching" | "generating" | "ready" | "sending" | "sent";
 
@@ -80,10 +100,11 @@ const emptyBrief: HuntBrief = {
 function HuntPage() {
   const { user } = useAuth();
   const [brief, setBrief] = useState<HuntBrief>(() => {
+    const isClient = typeof window !== "undefined";
     return {
       ...emptyBrief,
-      targetRole: localStorage.getItem('agentapply_hunt_role') || "",
-      location: localStorage.getItem('agentapply_hunt_location') || "",
+      targetRole: isClient ? localStorage.getItem('agentapply_hunt_role') || "" : "",
+      location: isClient ? localStorage.getItem('agentapply_hunt_location') || "" : "",
     };
   });
 
@@ -98,9 +119,11 @@ function HuntPage() {
   }, [user]);
 
   const [started, setStarted] = useState(() => {
+    if (typeof window === "undefined") return false;
     return localStorage.getItem('agentapply_hunt_started') === 'true';
   });
   const [cards, setCards] = useState<Card[]>(() => {
+    if (typeof window === "undefined") return [];
     const saved = localStorage.getItem('agentapply_hunt_state');
     if (saved) {
       try { return JSON.parse(saved); } catch (e) { return []; }
@@ -271,14 +294,14 @@ function HuntPage() {
           {started && (
             <button
               onClick={() => setShowResetModal(true)}
-              className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-terracotta hover:border-terracotta"
+              className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-terracotta hover:border-terracotta btn-ripple"
             >
               New Hunt
             </button>
           )}
           <button
             onClick={() => setStarted(false)}
-            className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
+            className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream btn-ripple"
           >
             Edit Brief
           </button>
@@ -289,29 +312,36 @@ function HuntPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-4">
         <Column title="Searching" count={searching.length} accent="terracotta">
-          {searching.map((c) => (
-            <JobCard key={c.id} card={c} onReview={handleOpenPopup} onSkip={handleSkip} />
+          {searching.map((c, index) => (
+            <JobCard key={c.id} card={c} onReview={handleOpenPopup} onSkip={handleSkip} index={index} />
           ))}
-          {searching.length === 0 && <EmptyHint text="Scouting roles for you…" />}
+          {started && cards.length === 0 && (
+            <>
+              <ShimmerCard index={0} />
+              <ShimmerCard index={1} />
+              <ShimmerCard index={2} />
+            </>
+          )}
+          {searching.length === 0 && (!started || cards.length > 0) && <EmptyHint text="Scouting roles for you…" />}
         </Column>
 
         <Column title="Generating" count={generating.length} accent="sand">
-          {generating.map((c) => (
-            <GeneratingCard key={c.id} card={c} />
+          {generating.map((c, index) => (
+            <GeneratingCard key={c.id} card={c} index={index} />
           ))}
           {generating.length === 0 && <EmptyHint text="Drafts will appear here." />}
         </Column>
 
         <Column title="Ready to Send" count={ready.length} accent="sage">
-          {ready.map((c) => (
-            <ReadyCard key={c.id} card={c} onSend={handleSend} onUpdate={updateCard} onSkip={handleSkip} onOpenPopup={handleOpenPopup} />
+          {ready.map((c, index) => (
+            <ReadyCard key={c.id} card={c} onSend={handleSend} onUpdate={updateCard} onSkip={handleSkip} onOpenPopup={handleOpenPopup} index={index} />
           ))}
           {ready.length === 0 && <EmptyHint text="Reviewed applications land here." />}
         </Column>
 
         <Column title="Sent" count={sent.length} accent="sage">
-          {sent.map((c) => (
-            <SentCard key={c.id} card={c} />
+          {sent.map((c, index) => (
+            <SentCard key={c.id} card={c} index={index} />
           ))}
           {sent.length === 0 && <EmptyHint text="Sent applications land here." />}
         </Column>
@@ -335,13 +365,13 @@ function HuntPage() {
           <div className="flex gap-3">
             <button
               onClick={() => setShowResetModal(false)}
-              className="flex-1 rounded-card border border-cardborder px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-cream"
+              className="flex-1 rounded-card border border-cardborder px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-cream btn-ripple"
             >
               Cancel
             </button>
             <button
               onClick={handleReset}
-              className="flex-1 rounded-card bg-terracotta px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90"
+              className="flex-1 rounded-card bg-terracotta px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90 btn-ripple"
             >
               Yes, Clear It
             </button>
@@ -502,7 +532,7 @@ function SetupForm({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="w-1/3 rounded-card border border-cardborder px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-mutedtext transition-all hover:text-cream hover:border-terracotta"
+              className="w-1/3 rounded-card border border-cardborder px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-mutedtext transition-all hover:text-cream hover:border-terracotta btn-ripple"
             >
               Cancel
             </button>
@@ -510,7 +540,7 @@ function SetupForm({
           <button
             onClick={submit}
             disabled={!canStart}
-            className={`${onCancel ? 'w-2/3' : 'w-full'} rounded-card bg-terracotta px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-all hover:scale-[1.01] hover:shadow-[var(--shadow-glow-strong)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none`}
+            className={`${onCancel ? 'w-2/3' : 'w-full'} rounded-card bg-terracotta px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-all hover:scale-[1.01] hover:shadow-[var(--shadow-glow-strong)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none btn-ripple`}
           >
             {onCancel ? 'Add to Hunt →' : 'Start the Hunt →'}
           </button>
@@ -647,15 +677,17 @@ function JobCard({
   card,
   onReview,
   onSkip,
+  index,
 }: {
   card: Card;
   onReview: (id: number | string) => void;
   onSkip: (id: number | string) => void;
+  index: number;
 }) {
   return (
     <article
-      style={{ animation: "var(--animate-slide-in)" }}
-      className="group rounded-card border border-cardborder bg-cardbg p-4 transition-all hover:-translate-y-0.5 hover:bg-cardbg-hover hover:shadow-[var(--shadow-glow)]"
+      style={{ animation: "var(--animate-slide-in)", animationDelay: `${index * 100}ms` }}
+      className="group rounded-card border border-cardborder bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
     >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -668,13 +700,13 @@ function JobCard({
       <div className="mt-4 flex items-center gap-2">
         <button
           onClick={() => onReview(card.id)}
-          className="flex-1 rounded-card border border-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-terracotta transition-all hover:bg-terracotta hover:text-darkbg"
+          className="flex-1 rounded-card border border-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-terracotta transition-all hover:bg-terracotta hover:text-darkbg btn-ripple"
         >
           Review
         </button>
         <button
           onClick={() => onSkip(card.id)}
-          className="rounded-card px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
+          className="rounded-card px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream btn-ripple"
         >
           Skip
         </button>
@@ -683,7 +715,7 @@ function JobCard({
   );
 }
 
-function GeneratingCard({ card }: { card: Card }) {
+function GeneratingCard({ card, index }: { card: Card; index: number }) {
   const [progress, setProgress] = useState(0);
   useEffect(() => {
     const start = Date.now();
@@ -697,8 +729,8 @@ function GeneratingCard({ card }: { card: Card }) {
 
   return (
     <article
-      style={{ animation: "var(--animate-slide-in)" }}
-      className="rounded-card border border-cardborder bg-cardbg p-4"
+      style={{ animation: "var(--animate-slide-in)", animationDelay: `${index * 100}ms` }}
+      className="rounded-card border border-cardborder bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
     >
       <div className="mb-3 flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -729,12 +761,14 @@ function ReadyCard({
   onUpdate,
   onSkip,
   onOpenPopup,
+  index,
 }: {
   card: Card;
   onSend: (id: number | string) => void;
   onUpdate: (id: number | string, patch: Partial<Card>) => void;
   onSkip: (id: number | string) => void;
   onOpenPopup: (id: number | string) => void;
+  index: number;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -744,8 +778,11 @@ function ReadyCard({
 
   return (
     <article
-      style={{ animation: isSent ? "var(--animate-scale-out)" : "var(--animate-slide-in)" }}
-      className="rounded-card border border-sage/70 bg-cardbg p-4"
+      style={{ 
+        animation: isSent ? "var(--animate-scale-out)" : "var(--animate-slide-in)",
+        animationDelay: isSent ? "0ms" : `${index * 100}ms`
+      }}
+      className="rounded-card border border-sage/70 bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
     >
       <button
         onClick={() => setOpen((o) => !o)}
@@ -806,20 +843,20 @@ function ReadyCard({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setEditing((e) => !e)}
-              className="rounded-card border border-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-terracotta transition-colors hover:bg-terracotta hover:text-darkbg"
+              className="rounded-card border border-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-terracotta transition-colors hover:bg-terracotta hover:text-darkbg btn-ripple"
             >
               {editing ? "Done" : "Edit"}
             </button>
             <button
               onClick={() => onSkip(card.id)}
-              className="rounded-card px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
+              className="rounded-card px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream btn-ripple"
             >
               Discard
             </button>
             <button
               onClick={() => onSend(card.id)}
               disabled={isSent || isSending}
-              className="flex-1 rounded-card bg-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-darkbg transition-all hover:shadow-[var(--shadow-glow-strong)] disabled:opacity-50"
+              className="flex-1 rounded-card bg-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-darkbg transition-all hover:shadow-[var(--shadow-glow-strong)] disabled:opacity-50 btn-ripple"
             >
               {isSent ? "Sent ✓" : isSending ? "Sending..." : "Send"}
             </button>
@@ -831,10 +868,10 @@ function ReadyCard({
   );
 }
 
-function SentCard({ card }: { card: Card }) {
+function SentCard({ card, index }: { card: Card; index: number }) {
   return (
     <article
-      style={{ animation: "var(--animate-slide-in)" }}
+      style={{ animation: "var(--animate-slide-in)", animationDelay: `${index * 100}ms` }}
       className="rounded-card border border-sage/40 bg-cardbg p-4 opacity-80"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -967,14 +1004,14 @@ function CompanyDetailPopup({
         <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-cardborder">
           <button
             onClick={onSkip}
-            className="rounded-card border border-cardborder px-4 py-2 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-terracotta"
+            className="rounded-card border border-cardborder px-4 py-2 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-terracotta btn-ripple"
           >
             Discard
           </button>
           {card.status !== "ready" && (
             <button
               onClick={onGenerate}
-              className="rounded-card bg-terracotta px-6 py-2 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90"
+              className="rounded-card bg-terracotta px-6 py-2 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90 btn-ripple"
             >
               {card.hr_email ? "Generate Email & Apply" : "Generate & Apply"}
             </button>

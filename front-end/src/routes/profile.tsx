@@ -25,12 +25,14 @@ function ProfilePage() {
 function Profile() {
   const { user, updateUserPreferences } = useAuth();
   
-  // Set defaults from preferences if they exist, otherwise fall back to localStorage
-  const defaultRole = user?.preferences?.role || localStorage.getItem('profileRole') || "";
-  const defaultLoc = user?.preferences?.location || localStorage.getItem('profileLocation') || "";
-
-  const [role, setRole] = useState(defaultRole);
-  const [location, setLocation] = useState(defaultLoc);
+  const [role, setRole] = useState(() => {
+    const isClient = typeof window !== "undefined";
+    return user?.preferences?.role || (isClient ? localStorage.getItem('profileRole') || "" : "");
+  });
+  const [location, setLocation] = useState(() => {
+    const isClient = typeof window !== "undefined";
+    return user?.preferences?.location || (isClient ? localStorage.getItem('profileLocation') || "" : "");
+  });
 
   useEffect(() => {
     if (user?.preferences) {

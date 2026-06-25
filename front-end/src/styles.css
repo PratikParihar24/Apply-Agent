@@ -1,10 +1,26 @@
-@import "tailwindcss" source(none);
-@source "../src";
+@import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
 
-@theme {
+:root {
+  /* Light Mode values */
+  --color-darkbg: #F9F6F0;
+  --color-cardbg: #FFFFFF;
+  --color-cardbg-hover: #F1ECE4;
+  --color-cream: #1A1410;
+  --color-mutedtext: #6A5D55;
+  --color-terracotta: #E07A5F;
+  --color-sand: #B58A4D;
+  --color-sage: #4E876C;
+  --color-cardborder: rgba(224, 122, 95, 0.25);
+  --color-border: rgba(224, 122, 95, 0.20);
+  --shadow-glow: 0 8px 32px rgba(224, 122, 95, 0.1);
+  --shadow-glow-strong: 0 8px 48px rgba(224, 122, 95, 0.2);
+}
+
+.dark {
+  /* Dark Mode values */
   --color-darkbg: #1A1410;
   --color-cardbg: #2C1F1A;
   --color-cardbg-hover: #3D2C24;
@@ -14,32 +30,45 @@
   --color-sand: #F2CC8F;
   --color-sage: #81B29A;
   --color-cardborder: rgba(224, 122, 95, 0.15);
-
-  --color-background: #1A1410;
-  --color-foreground: #F4F1DE;
-  --color-card: #2C1F1A;
-  --color-card-foreground: #F4F1DE;
-  --color-popover: #2C1F1A;
-  --color-popover-foreground: #F4F1DE;
-  --color-primary: #E07A5F;
-  --color-primary-foreground: #1A1410;
-  --color-secondary: #3D2C24;
-  --color-secondary-foreground: #F4F1DE;
-  --color-muted: #2C1F1A;
-  --color-muted-foreground: #A8988A;
-  --color-accent: #F2CC8F;
-  --color-accent-foreground: #1A1410;
-  --color-destructive: #c0392b;
-  --color-destructive-foreground: #F4F1DE;
   --color-border: rgba(224, 122, 95, 0.15);
-  --color-input: rgba(224, 122, 95, 0.25);
-  --color-ring: #E07A5F;
+  --shadow-glow: 0 8px 32px rgba(224, 122, 95, 0.2);
+  --shadow-glow-strong: 0 8px 48px rgba(224, 122, 95, 0.4);
+}
+
+@theme {
+  --color-darkbg: var(--color-darkbg);
+  --color-cardbg: var(--color-cardbg);
+  --color-cardbg-hover: var(--color-cardbg-hover);
+  --color-cream: var(--color-cream);
+  --color-mutedtext: var(--color-mutedtext);
+  --color-terracotta: var(--color-terracotta);
+  --color-sand: var(--color-sand);
+  --color-sage: var(--color-sage);
+  --color-cardborder: var(--color-cardborder);
+
+  --color-background: var(--color-darkbg);
+  --color-foreground: var(--color-cream);
+  --color-card: var(--color-cardbg);
+  --color-card-foreground: var(--color-cream);
+  --color-popover: var(--color-cardbg);
+  --color-popover-foreground: var(--color-cream);
+  --color-primary: var(--color-terracotta);
+  --color-primary-foreground: var(--color-darkbg);
+  --color-secondary: var(--color-cardbg-hover);
+  --color-secondary-foreground: var(--color-cream);
+  --color-muted: var(--color-cardbg);
+  --color-muted-foreground: var(--color-mutedtext);
+  --color-accent: var(--color-sand);
+  --color-accent-foreground: var(--color-darkbg);
+  --color-border: var(--color-border);
+  --color-input: var(--color-cardborder);
+  --color-ring: var(--color-terracotta);
 
   --radius-card: 16px;
   --radius-column: 24px;
 
-  --shadow-glow: 0 8px 32px rgba(224, 122, 95, 0.2);
-  --shadow-glow-strong: 0 8px 48px rgba(224, 122, 95, 0.4);
+  --shadow-glow: var(--shadow-glow);
+  --shadow-glow-strong: var(--shadow-glow-strong);
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 
@@ -72,6 +101,15 @@
     background-color: var(--color-darkbg);
     color: var(--color-cream);
     font-family: var(--font-sans);
+    transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+    scroll-behavior: smooth;
+    overflow-x: hidden;
+  }
+  
+  /* Keyboard outline accessibility overrides */
+  button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--color-terracotta);
+    outline-offset: 2px;
   }
 }
 
@@ -84,4 +122,43 @@
   );
   background-size: 200% 100%;
   animation: pulseShimmer 2s ease-in-out infinite;
+}
+
+/* Button ripple pseudo effect */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+.btn-ripple::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+}
+.btn-ripple:active::after {
+  width: 250px;
+  height: 250px;
+  opacity: 1;
+  transition: 0s;
+}
+
+/* Card hover utility */
+.hover-card-trigger {
+  transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.hover-card-trigger:hover {
+  transform: scale(1.02);
+  border-color: rgba(224, 122, 95, 0.4);
+  box-shadow: var(--shadow-glow-strong);
+}
+
+.mobile-menu-aside {
+  background-color: var(--color-cardbg) !important;
 }

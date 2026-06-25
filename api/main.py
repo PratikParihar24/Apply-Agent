@@ -46,9 +46,22 @@ async def get_status():
 def get_llm_status():
     return get_active_llm_info()
 
+from pydantic import BaseModel
+
 @app.get("/api/user/profile")
 def get_user_profile():
     from dotenv import load_dotenv
     env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
     load_dotenv(env_path)
     return {"email": os.getenv("GMAIL_ADDRESS", "")}
+
+class FeedbackRequest(BaseModel):
+    name: str = ""
+    email: str = ""
+    message: str
+
+@app.post("/api/feedback")
+async def receive_feedback(request: FeedbackRequest):
+    print(f"Feedback received from {request.name} ({request.email}): {request.message}")
+    return {"success": True, "message": "Feedback received"}
+

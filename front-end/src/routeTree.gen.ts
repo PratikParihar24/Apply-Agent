@@ -13,6 +13,7 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HuntRouteImport } from './routes/hunt'
+import { Route as FeedbackRouteImport } from './routes/feedback'
 import { Route as CommunityRouteImport } from './routes/community'
 import { Route as IndexRouteImport } from './routes/index'
 
@@ -36,6 +37,11 @@ const HuntRoute = HuntRouteImport.update({
   path: '/hunt',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeedbackRoute = FeedbackRouteImport.update({
+  id: '/feedback',
+  path: '/feedback',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CommunityRoute = CommunityRouteImport.update({
   id: '/community',
   path: '/community',
@@ -50,6 +56,7 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/community': typeof CommunityRoute
+  '/feedback': typeof FeedbackRoute
   '/hunt': typeof HuntRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/community': typeof CommunityRoute
+  '/feedback': typeof FeedbackRoute
   '/hunt': typeof HuntRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
@@ -67,6 +75,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/community': typeof CommunityRoute
+  '/feedback': typeof FeedbackRoute
   '/hunt': typeof HuntRoute
   '/login': typeof LoginRoute
   '/profile': typeof ProfileRoute
@@ -74,13 +83,28 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/community' | '/hunt' | '/login' | '/profile' | '/register'
+  fullPaths:
+    | '/'
+    | '/community'
+    | '/feedback'
+    | '/hunt'
+    | '/login'
+    | '/profile'
+    | '/register'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/community' | '/hunt' | '/login' | '/profile' | '/register'
+  to:
+    | '/'
+    | '/community'
+    | '/feedback'
+    | '/hunt'
+    | '/login'
+    | '/profile'
+    | '/register'
   id:
     | '__root__'
     | '/'
     | '/community'
+    | '/feedback'
     | '/hunt'
     | '/login'
     | '/profile'
@@ -90,6 +114,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CommunityRoute: typeof CommunityRoute
+  FeedbackRoute: typeof FeedbackRoute
   HuntRoute: typeof HuntRoute
   LoginRoute: typeof LoginRoute
   ProfileRoute: typeof ProfileRoute
@@ -126,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HuntRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/feedback': {
+      id: '/feedback'
+      path: '/feedback'
+      fullPath: '/feedback'
+      preLoaderRoute: typeof FeedbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/community': {
       id: '/community'
       path: '/community'
@@ -146,6 +178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CommunityRoute: CommunityRoute,
+  FeedbackRoute: FeedbackRoute,
   HuntRoute: HuntRoute,
   LoginRoute: LoginRoute,
   ProfileRoute: ProfileRoute,
