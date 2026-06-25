@@ -7,7 +7,7 @@ export const uploadResume = async (file: File): Promise<any> => {
     }), 800));
 };
 
-export const startHunt = async (role: string, location: string, maxResults: number, onCompany?: (company: any) => void): Promise<any> => {
+export const startHunt = async (role: string, location: string, maxResults: number, onCompany?: (company: any) => void, onDone?: () => void): Promise<any> => {
     console.log("Mock startHunt called with:", { role, location, maxResults });
     
     const mockCompanies = Array.from({ length: 8 }, (_, i) => ({
@@ -19,13 +19,15 @@ export const startHunt = async (role: string, location: string, maxResults: numb
         url: `https://company${i + 1}.example.com/jobs/1`
     }));
 
-    return new Promise(async (resolve) => {
+    setTimeout(async () => {
         for (let i = 0; i < mockCompanies.length; i++) {
             await new Promise(r => setTimeout(r, 600)); // simulate search delay
             if (onCompany) onCompany(mockCompanies[i]);
         }
-        resolve({ success: true });
-    });
+        if (onDone) onDone();
+    }, 100);
+
+    return { success: true, job_id: 'mock-job-123', status: 'started' };
 };
 
 export const generateForCompany = async (companyId: string): Promise<any> => {

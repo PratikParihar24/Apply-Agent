@@ -1,6 +1,6 @@
 import * as mockClient from "./mockClient";
 
-const USE_MOCK = localStorage.getItem('devMode') === 'true'; // flip to true for UI-only testing
+const USE_MOCK = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('devMode') === 'true' : false; // flip to true for UI-only testing
 
 const BASE_URL = "http://localhost:8000";
 

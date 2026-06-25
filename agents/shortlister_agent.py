@@ -29,26 +29,7 @@ class ShortlisterAgent:
             if progress_callback:
                 progress_callback(idx + 1, len(companies), company_name)
             
-            prompt = (
-                f"Evaluate the fit between the following resume summary and the job description. "
-                f"Score the fit on a scale of 1 to 10, where 10 is a perfect match.\n\n"
-                f"Resume Summary: {resume_summary}\n\n"
-                f"Job Title: {job_title}\n"
-                f"Company: {company_name}\n"
-                f"Job Description: {description}\n\n"
-                f"Provide your score as a single integer between 1 and 10."
-            )
-            
-            try:
-                response = self.llm.invoke(prompt)
-                content = response.content
-                
-                # Parse the integer score from LLM response (first number found)
-                match = re.search(r'\b([1-9]|10)\b', content)
-                score = int(match.group(1)) if match else 0
-            except Exception as e:
-                print(f"LLM call failed for {company_name}: {e}")
-                score = 0
+            score = self._quick_score(comp, resume_summary)
                 
             comp_copy = comp.copy()
             comp_copy["score"] = score
@@ -58,37 +39,19 @@ class ShortlisterAgent:
         scored_companies.sort(key=lambda x: x["score"], reverse=True)
         return scored_companies[:top_n]
 
+    def _quick_score(self, company: dict, resume_summary: str) -> int:
+        text = (company.get('description', '') + ' ' + company.get('job_title', '')).lower()
+        keywords = resume_summary.lower().split()[:50]  # first 50 words
+        matches = sum(1 for k in keywords if k in text and len(k) > 4)
+        return min(10, max(4, matches))
+
     def shortlist_stream(self, companies: list[dict], resume_summary: str):
         """
         Yields each company dict immediately after it has been scored.
         """
         print("Shortlisting companies (streaming)...")
         for idx, comp in enumerate(companies):
-            job_title = comp.get("job_title", "")
-            company_name = comp.get("company", "")
-            description = comp.get("description", "")
-            
-            prompt = (
-                f"Evaluate the fit between the following resume summary and the job description. "
-                f"Score the fit on a scale of 1 to 10, where 10 is a perfect match.\n\n"
-                f"Resume Summary: {resume_summary}\n\n"
-                f"Job Title: {job_title}\n"
-                f"Company: {company_name}\n"
-                f"Job Description: {description}\n\n"
-                f"Provide your score as a single integer between 1 and 10."
-            )
-            
-            try:
-                response = self.llm.invoke(prompt)
-                content = response.content
-                
-                # Parse the integer score from LLM response (first number found)
-                match = re.search(r'\b([1-9]|10)\b', content)
-                score = int(match.group(1)) if match else 0
-            except Exception as e:
-                print(f"LLM call failed for {company_name}: {e}")
-                score = 0
-                
+            score = self._quick_score(comp, resume_summary)
             comp_copy = comp.copy()
             comp_copy["score"] = score
             yield comp_copy

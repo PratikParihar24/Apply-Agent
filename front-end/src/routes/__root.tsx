@@ -67,8 +67,52 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
+      <body suppressHydrationWarning>{children}<Scripts /></body>
     </html>
+  );
+}
+
+function LLMStatusPill() {
+  const [status, setStatus] = useState<any>(null);
+  
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("http://localhost:8000/api/llm/status");
+        if (res.ok) {
+          const data = await res.json();
+          setStatus(data);
+        } else {
+          setStatus({ type: 'error' });
+        }
+      } catch (e) {
+        setStatus({ type: 'error' });
+      }
+    };
+    
+    fetchStatus();
+    const interval = setInterval(fetchStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  if (!status) return <div className="ml-4 h-7 w-24 animate-pulse rounded-full border border-cardborder bg-cardbg" />;
+
+  let dotColor = "bg-gray-500";
+  let label = "No LLM";
+
+  if (status.type === "local") {
+    dotColor = "bg-sage";
+    label = `Local: ${status.model}`;
+  } else if (status.type === "cloud") {
+    dotColor = "bg-[#4285F4]"; // blue
+    label = `Cloud: Gemini`;
+  }
+
+  return (
+    <div className="ml-4 flex items-center gap-2 rounded-full border border-cardborder bg-cardbg px-3 py-1.5 shadow-sm transition-all hover:border-terracotta/50">
+      <span className={`h-2 w-2 rounded-full ${dotColor} shadow-[0_0_8px_rgba(0,0,0,0.5)]`} />
+      <span className="text-xs font-bold tracking-wide text-cream">{label}</span>
+    </div>
   );
 }
 
@@ -109,6 +153,7 @@ function Navbar() {
               </button>
             </div>
           )}
+          <LLMStatusPill />
         </div>
       </nav>
     </header>

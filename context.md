@@ -61,6 +61,17 @@ Agent-apply/
 - `get_llm(prefer='gemini')`: Returns a LangChain-compatible chat model. 
   - Attempts to initialize `ChatGoogleGenerativeAI` using `gemini-1.5-flash`.
   - If the Gemini API key is missing or initialization fails, falls back to `ChatOllama` running the `mistral` model locally.
+- `get_active_llm_info() -> dict`: Detects and returns information about the currently active LLM (provider, model name, and type: local vs cloud).
+
+### 2a. `api/main.py`
+**Purpose**: Exposes the backend capabilities as REST and SSE streaming endpoints.
+**Endpoints**:
+- `POST /api/resume/upload`: Parses resume and returns sections/summary.
+- `POST /api/hunt/start`: Generates a `job_id`, initializes a background thread for parallel searching/scoring, and returns immediately.
+- `GET /api/hunt/stream/{job_id}`: SSE endpoint that streams companies directly to the frontend as soon as they are found and scored.
+- `POST /api/generate/{company_id}`: Generates tailored resume, cover letter, and email body.
+- `POST /api/send/{company_id}`: Sends the final application via email.
+- `GET /api/llm/status`: Returns current LLM status for the frontend UI.
 
 ### 3. `core/embedder.py`
 **Purpose**: Handles vector embeddings for text chunks using `sentence-transformers`.
@@ -93,7 +104,8 @@ Agent-apply/
 **Classes**:
 - `class SearchAgent`:
   - **Methods**:
-    - `search(self, role: str, location: str) -> list[dict]`: Queries DuckDuckGo for jobs, parses the title to extract `company` and `job_title`, deduplicates by company, and handles API rate-limits/retries gracefully.
+    - `search(self, role: str, location: str) -> list[dict]`: Executes 4 specialized queries in parallel using `ThreadPoolExecutor`. Extracts company names directly from LinkedIn URLs or falls back to title parsing, then deduplicates.
+    - `search_stream(self, role, location, resume_summary_text, on_result_callback)`: Calls `search()`, iterates through results, scores them using the ShortlisterAgent instantly, and triggers the callback to stream them out via `api/main.py`.
 
 ### 6. `agents/shortlister_agent.py`
 **Purpose**: Evaluates and scores the fit between the parsed resume summary and the scraped job descriptions.
@@ -127,13 +139,16 @@ Agent-apply/
 - `requirements.txt`: Defines all pip dependencies (`chromadb`, `langchain`, `streamlit`, `sentence-transformers`, etc.).
 - `.gitignore`: Ensures `__pycache__`, `.env`, and `data/*` (except `.gitkeep`) are ignored by Git.
 
-## 🔄 Current Application Flow (Resume Parsing)
+## 🔄 Current Application Flow (Resume Parsing & Streaming Hunt)
 1. **User/System** invokes `ResumeProcessor.process('data/resume.pdf')`.
 2. Text is extracted via `PyPDF2` (fallback to `pdfplumber`).
-3. The parser breaks the text into sections based on detected uppercase/title-case headers.
-4. Each section is chunked, embedded via `core.embedder`, and stored into `ChromaDB` with `{section, chunk_index}` metadata.
-5. A summary is generated and returned alongside extraction metrics.
-6. The `ResumeProcessor.query(jd)` method can now be used to find chunks most relevant to a specific Job Description.
+3. The parser breaks the text into sections and chunks them into `ChromaDB`.
+4. A summary is generated for shortlisting.
+5. **Hunt Initiation**: The user posts to `/api/hunt/start`. The API returns a `job_id` and kicks off a background thread.
+6. The frontend immediately transitions to the dashboard and connects to `GET /api/hunt/stream/{job_id}`.
+7. The backend runs 4 parallel search queries, then scores each job one by one using the LLM, pushing them into a queue.
+8. The SSE endpoint streams these jobs to the frontend in real-time, displaying them in the "Searching" column.
+9. **Review & Application**: The user can "Review" a job (generating materials), edit the resulting application in the "Ready" column, and click "Send Application" to dispatch the email and move it to the "Sent" column.
 
 ## 📌 Development Notes
 - The modules are kept **strictly decoupled**. For instance, `agents/resume_processor.py` relies ONLY on `core/` and `config/`.

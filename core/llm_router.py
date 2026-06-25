@@ -38,3 +38,20 @@ def get_llm(prefer='ollama'):
             
     # Absolute fallback to Ollama (even if it might error on invoke, it's the last resort)
     return ChatOllama(model="phi3:mini", base_url=base_url)
+
+def get_active_llm_info() -> dict:
+    """
+    Returns information about the currently active LLM.
+    """
+    base_url = OLLAMA_BASE_URL or "http://localhost:11434"
+    try:
+        response = requests.get(f"{base_url}/api/tags", timeout=2)
+        if response.status_code == 200:
+            models = [m['name'] for m in response.json().get('models', [])]
+            if models:
+                model_name = next((m for m in models if m.startswith("phi3:mini")), models[0])
+                return {"provider": "ollama", "model": model_name, "type": "local"}
+    except requests.exceptions.RequestException:
+        pass
+    
+    return {"provider": "gemini", "model": "gemini-2.0-flash", "type": "cloud"}

@@ -37,6 +37,7 @@ interface Card extends Company {
   emailBody: string;
   resume: string;
   subject?: string;
+  sentAt?: string;
 }
 
 interface HuntBrief {
@@ -83,7 +84,7 @@ function HuntPage() {
   }, [started]);
 
   const updateCard = (id: number | string, patch: Partial<Card>) =>
-    setCards((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    setCards((prev) => prev.map((c) => (String(c.id) === String(id) ? { ...c, ...patch } : c)));
 
   const handleReview = async (id: number | string) => {
     updateCard(id, { status: "generating" });
@@ -103,13 +104,13 @@ function HuntPage() {
     }
   };
 
-  const handleSkip = (id: number | string) => setCards((prev) => prev.filter((c) => c.id !== id));
+  const handleSkip = (id: number | string) => setCards((prev) => prev.filter((c) => String(c.id) !== String(id)));
 
   const handleSend = async (id: number | string) => {
-    const c = cards.find((x) => x.id === id);
+    const c = cards.find((x) => String(x.id) === String(id));
     if (!c) return;
 
-    updateCard(id, { status: "sent" });
+    updateCard(id, { status: "sent", sentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
     try {
       const payload = {
         cover_letter: c.coverLetter,
@@ -123,7 +124,6 @@ function HuntPage() {
       } else {
         throw new Error(res.status || "Unknown error");
       }
-      setTimeout(() => setCards((prev) => prev.filter((x) => x.id !== id)), 600);
     } catch (error) {
       const e = error as Error;
       toast.error(`Failed to send — check your email config: ${e.message}`);
@@ -137,35 +137,46 @@ function HuntPage() {
     setStarted(false);
   };
 
-  const handleStart = () => {
-    setStarted(true);
-    startHunt(brief.targetRole, brief.location || "Remote", 10, (c) => {
-      setCards((prev) => [
-        ...prev,
-        {
-          ...c,
-          status: "searching",
-          coverLetter: "",
-          emailBody: "",
-          resume: "",
-          role: c.job_title || c.role || "",
-          desc: c.description || c.desc || "",
-        },
-      ]);
-    }).catch((error) => {
+  const handleStart = async () => {
+    try {
+      const res = await startHunt(brief.targetRole, brief.location || "Remote", 10, (c) => {
+        setCards((prev) => {
+          if (prev.some((existing) => String(existing.id) === String(c.id))) return prev;
+          return [
+            ...prev,
+            {
+              ...c,
+              status: "searching",
+              coverLetter: "",
+              emailBody: "",
+              resume: "",
+              role: c.job_title || c.role || "",
+              desc: c.description || c.desc || "",
+            },
+          ];
+        });
+      });
+      
+      // Page navigates/transitions to hunt dashboard immediately after getting job_id
+      setStarted(true);
+      toast.success(`Hunt started! Job ID: ${res.job_id}`);
+    } catch (error) {
       const e = error as Error;
       toast.error(`Hunt failed to start: ${e.message}`);
       setStarted(false);
-    });
+    }
   };
 
   if (!started) {
     return <SetupForm brief={brief} setBrief={setBrief} onStart={handleStart} />;
   }
 
-  const searching = cards.filter((c) => c.status === "searching");
+  const searching = cards
+    .filter((c) => c.status === "searching")
+    .sort((a, b) => b.score - a.score);
   const generating = cards.filter((c) => c.status === "generating");
-  const ready = cards.filter((c) => c.status === "ready" || c.status === "sent");
+  const ready = cards.filter((c) => c.status === "ready");
+  const sent = cards.filter((c) => c.status === "sent");
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
@@ -194,7 +205,7 @@ function HuntPage() {
 
       <BriefChips brief={brief} />
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
+      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-4">
         <Column title="Searching" count={searching.length} accent="terracotta">
           {searching.map((c) => (
             <JobCard key={c.id} card={c} onReview={handleReview} onSkip={handleSkip} />
@@ -211,9 +222,16 @@ function HuntPage() {
 
         <Column title="Ready to Send" count={ready.length} accent="sage">
           {ready.map((c) => (
-            <ReadyCard key={c.id} card={c} onSend={handleSend} onUpdate={updateCard} />
+            <ReadyCard key={c.id} card={c} onSend={handleSend} onUpdate={updateCard} onSkip={handleSkip} />
           ))}
           {ready.length === 0 && <EmptyHint text="Reviewed applications land here." />}
+        </Column>
+
+        <Column title="Sent" count={sent.length} accent="sage">
+          {sent.map((c) => (
+            <SentCard key={c.id} card={c} />
+          ))}
+          {sent.length === 0 && <EmptyHint text="Sent applications land here." />}
         </Column>
       </div>
     </main>
@@ -582,10 +600,12 @@ function ReadyCard({
   card,
   onSend,
   onUpdate,
+  onSkip,
 }: {
   card: Card;
   onSend: (id: number | string) => void;
   onUpdate: (id: number | string, patch: Partial<Card>) => void;
+  onSkip: (id: number | string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -654,6 +674,12 @@ function ReadyCard({
               {editing ? "Done" : "Edit"}
             </button>
             <button
+              onClick={() => onSkip(card.id)}
+              className="rounded-card px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
+            >
+              Skip
+            </button>
+            <button
               onClick={() => onSend(card.id)}
               disabled={isSent}
               className="flex-1 rounded-card bg-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-darkbg transition-all hover:shadow-[var(--shadow-glow-strong)] disabled:opacity-50"
@@ -663,6 +689,26 @@ function ReadyCard({
           </div>
         </div>
       )}
+    </article>
+  );
+}
+
+function SentCard({ card }: { card: Card }) {
+  return (
+    <article
+      style={{ animation: "var(--animate-slide-in)" }}
+      className="rounded-card border border-sage/40 bg-cardbg p-4 opacity-80"
+    >
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="truncate font-bold text-cream">{card.name}</h3>
+          <p className="truncate text-xs text-mutedtext">{card.role}</p>
+        </div>
+        <span className="rounded-full bg-sage/20 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-sage">
+          Sent ✓
+        </span>
+      </div>
+      <p className="mt-3 text-xs text-mutedtext">Sent at {card.sentAt}</p>
     </article>
   );
 }

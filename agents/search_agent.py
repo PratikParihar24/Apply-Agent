@@ -58,7 +58,7 @@ class SearchAgent:
             while attempts < max_attempts:
                 try:
                     with DDGS() as ddgs:
-                        for r in ddgs.text(query, max_results=MAX_SEARCH_RESULTS):
+                        for r in ddgs.text(query, max_results=5):
                             query_results.append(r)
                             time.sleep(random.uniform(0.5, 1.5))
                     break
@@ -103,18 +103,68 @@ class SearchAgent:
 
     def search_stream(self, role: str, location: str, resume_summary_text: str, on_result_callback):
         """
-        Calls search() to get raw results, then scores each one individually
-        with the shortlister and calls on_result_callback immediately.
+        Runs 4 parallel queries. As each query yields results, it scores them 
+        instantly and calls on_result_callback.
         """
         from agents.shortlister_agent import ShortlisterAgent
+        import concurrent.futures
         
-        raw_results = self.search(role, location)
+        queries = [
+            f'{role} internship {location} site:linkedin.com/jobs',
+            f'{role} hiring {location} site:instahyre.com OR site:naukri.com OR site:wellfound.com',
+            f'"{role}" job opening {location} -site:glassdoor.com -site:indeed.com',
+            f'{role} we are hiring {location} 2025 2026',
+        ]
+        
+        seen_companies = set()
         shortlister = ShortlisterAgent()
         
-        for company in raw_results:
-            # We pass a list of 1 company to shortlist_stream so it scores it instantly
-            for scored_company in shortlister.shortlist_stream([company], resume_summary_text):
-                on_result_callback(scored_company)
+        def _run_query(query: str):
+            attempts = 0
+            max_attempts = 2
+            while attempts < max_attempts:
+                try:
+                    with DDGS() as ddgs:
+                        for r in ddgs.text(query, max_results=5):
+                            url = r.get("href", "")
+                            title = r.get("title", "")
+                            
+                            if "linkedin.com/company/" in url:
+                                slug_match = re.search(r"linkedin\.com/company/([^/]+)", url)
+                                if slug_match:
+                                    company = slug_match.group(1).replace("-", " ").title()
+                                    job_title, _ = self._parse_title(title)
+                                else:
+                                    job_title, company = self._parse_title(title)
+                            else:
+                                job_title, company = self._parse_title(title)
+                                
+                            comp_key = company.lower()
+                            if comp_key not in seen_companies:
+                                seen_companies.add(comp_key)
+                                job_dict = {
+                                    "company": company,
+                                    "job_title": job_title,
+                                    "url": url,
+                                    "description": r.get("body", ""),
+                                    "source": "duckduckgo"
+                                }
+                                
+                                # Score instantly
+                                for scored_company in shortlister.shortlist_stream([job_dict], resume_summary_text):
+                                    on_result_callback(scored_company)
+                                    
+                            time.sleep(random.uniform(0.5, 1.5))
+                    break
+                except Exception as e:
+                    print(f"DDGS Search Exception for '{query}': {e}")
+                    attempts += 1
+                    if attempts < max_attempts:
+                        time.sleep(2)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(_run_query, q) for q in queries]
+            concurrent.futures.wait(futures)
 
 if __name__ == '__main__':
     agent = SearchAgent()

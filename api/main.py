@@ -14,11 +14,13 @@ import asyncio
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from agents.resume_processor import ResumeProcessor
+
 from agents.search_agent import SearchAgent
 from agents.shortlister_agent import ShortlisterAgent
 from agents.tailor_agent import TailorAgent
 from agents.writer_agent import WriterAgent
 from agents.sending_agent import SendingAgent
+from core.llm_router import get_active_llm_info
 
 app = FastAPI()
 
@@ -49,7 +51,7 @@ class SendRequest(BaseModel):
     recipient_email: str
 
 @app.post("/api/resume/upload")
-async def upload_resume(file: UploadFile = File(...)):
+def upload_resume(file: UploadFile = File(...)):
     global resume_summary_text, resume_sections_data
     os.makedirs("data", exist_ok=True)
     file_path = "data/resume.pdf"
@@ -81,6 +83,8 @@ async def start_hunt(request: SearchRequest):
         def on_result(company):
             nonlocal count
             if count < request.max_results:
+                if "id" not in company:
+                    company["id"] = str(uuid.uuid4())
                 hunt_queues[job_id].put(company)
                 count += 1
                 
@@ -174,3 +178,7 @@ async def get_status():
         "sections_found": resume_sections_data,
         "summary_preview": resume_summary_text[:200] + "..." if resume_summary_text else ""
     }
+
+@app.get("/api/llm/status")
+def get_llm_status():
+    return get_active_llm_info()
