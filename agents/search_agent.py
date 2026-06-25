@@ -138,18 +138,45 @@ class SearchAgent:
                             email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', body)
                             hr_email = email_match.group(0) if email_match else None
                             
-                            # Website extraction
-                            job_boards = ['naukri.com', 'glassdoor.com', 'indeed.com', 'linkedin.com', 'internshala.com', 'wellfound.com']
-                            is_job_board = any(jb in url.lower() for jb in job_boards)
-                            website = None if is_job_board else url
-                                
+                            job_boards = ['naukri.com', 'glassdoor.com', 'indeed.com', 'linkedin.com', 'internshala.com', 'wellfound.com', 'monster.com', 'ziprecruiter.com', 'careerbuilder.com']
+                            
                             comp_key = company.lower()
-                            if comp_key not in seen_companies:
+                            if comp_key not in seen_companies and comp_key != "unknown company":
                                 seen_companies.add(comp_key)
+                                
+                                # Secondary Search
+                                secondary_query = f'"{company}" official website'
+                                verified_website = None
+                                unverified = False
+                                
+                                try:
+                                    with DDGS() as ddgs:
+                                        for r2 in ddgs.text(secondary_query, max_results=3):
+                                            u2 = r2.get("href", "")
+                                            b2 = r2.get("body", "")
+                                            if not any(jb in u2.lower() for jb in job_boards):
+                                                verified_website = u2
+                                                if not hr_email:
+                                                    email_match2 = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', b2)
+                                                    if email_match2:
+                                                        hr_email = email_match2.group(0)
+                                                break
+                                    time.sleep(1)
+                                except Exception:
+                                    pass
+                                    
+                                if not verified_website:
+                                    is_job_board = any(jb in url.lower() for jb in job_boards)
+                                    website = None if is_job_board else url
+                                    unverified = True
+                                else:
+                                    website = verified_website
+
                                 job_dict = {
                                     "company": company,
                                     "job_title": job_title,
                                     "website": website,
+                                    "unverified": unverified,
                                     "description": body,
                                     "hr_email": hr_email,
                                     "apply_url": url,

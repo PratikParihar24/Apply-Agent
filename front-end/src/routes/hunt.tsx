@@ -126,6 +126,7 @@ function HuntPage() {
         cover_letter: c.coverLetter,
         email_body: c.emailBody,
         subject: c.subject || "Application",
+        tailored_resume: c.resume,
         recipient_email: "test@example.com", // Provide a placeholder or prompt the user if needed
       };
       const res = await sendApplication(String(id), payload);
@@ -235,7 +236,7 @@ function HuntPage() {
 
         <Column title="Ready to Send" count={ready.length} accent="sage">
           {ready.map((c) => (
-            <ReadyCard key={c.id} card={c} onSend={handleSend} onUpdate={updateCard} onSkip={handleSkip} />
+            <ReadyCard key={c.id} card={c} onSend={handleSend} onUpdate={updateCard} onSkip={handleSkip} onOpenPopup={handleOpenPopup} />
           ))}
           {ready.length === 0 && <EmptyHint text="Reviewed applications land here." />}
         </Column>
@@ -623,11 +624,13 @@ function ReadyCard({
   onSend,
   onUpdate,
   onSkip,
+  onOpenPopup,
 }: {
   card: Card;
   onSend: (id: number | string) => void;
   onUpdate: (id: number | string, patch: Partial<Card>) => void;
   onSkip: (id: number | string) => void;
+  onOpenPopup: (id: number | string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -649,6 +652,13 @@ function ReadyCard({
               Ready
             </span>
             <ScoreBadge score={card.score} />
+            <button
+              onClick={(e) => { e.stopPropagation(); onOpenPopup(card.id); }}
+              className="p-1 rounded hover:bg-darkbg text-mutedtext hover:text-cream transition-colors"
+              title="Review Company"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+            </button>
           </div>
           <h3 className="truncate font-bold text-cream">{card.name}</h3>
           <p className="truncate text-xs text-mutedtext">{card.role}</p>
@@ -699,7 +709,7 @@ function ReadyCard({
               onClick={() => onSkip(card.id)}
               className="rounded-card px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
             >
-              Skip
+              Discard
             </button>
             <button
               onClick={() => onSend(card.id)}
@@ -853,14 +863,16 @@ function CompanyDetailPopup({
             onClick={onSkip}
             className="rounded-card border border-cardborder px-4 py-2 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-terracotta"
           >
-            Skip
+            Discard
           </button>
-          <button
-            onClick={onGenerate}
-            className="rounded-card bg-terracotta px-6 py-2 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90"
-          >
-            {card.hr_email ? "Generate Email & Apply" : "Generate & Apply"}
-          </button>
+          {card.status !== "ready" && (
+            <button
+              onClick={onGenerate}
+              className="rounded-card bg-terracotta px-6 py-2 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90"
+            >
+              {card.hr_email ? "Generate Email & Apply" : "Generate & Apply"}
+            </button>
+          )}
         </div>
       </div>
     </div>

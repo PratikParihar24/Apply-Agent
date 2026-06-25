@@ -48,6 +48,7 @@ class SendRequest(BaseModel):
     cover_letter: str
     email_body: str
     subject: str
+    tailored_resume: str
     recipient_email: str
 
 @app.post("/api/resume/upload")
@@ -158,14 +159,14 @@ async def send_application(company_id: str, request: SendRequest):
         
     sending_agent = SendingAgent()
     try:
-        success = sending_agent.send(
+        res = sending_agent.send_application(
             company=company,
-            resume_path="data/resume.pdf",
             cover_letter=request.cover_letter,
             email_body=request.email_body,
-            subject=request.subject
+            subject=request.subject,
+            tailored_resume=request.tailored_resume
         )
-        return {"success": success, "status": "sent" if success else "failed"}
+        return {"success": res["success"], "status": res["message"]}
     except Exception as e:
         return {"success": False, "status": str(e)}
 
@@ -182,3 +183,10 @@ async def get_status():
 @app.get("/api/llm/status")
 def get_llm_status():
     return get_active_llm_info()
+
+@app.get("/api/user/profile")
+def get_user_profile():
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    return {"email": os.getenv("GMAIL_ADDRESS", "")}
