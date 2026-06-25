@@ -6,7 +6,8 @@ from email.mime.application import MIMEApplication
 from fpdf import FPDF
 from dotenv import load_dotenv
 
-load_dotenv()
+env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
+load_dotenv(env_path)
 
 class SendingAgent:
     def send_application(self, company: dict, cover_letter: str, email_body: str, subject: str, tailored_resume: str) -> dict:

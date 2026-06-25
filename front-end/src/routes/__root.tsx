@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useNavigate,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -12,6 +13,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { AuthProvider, useAuth } from "../context/AuthContext";
 
 function NotFoundComponent() {
   return (
@@ -120,15 +122,31 @@ function Navbar() {
   const linkCls = "text-sm text-mutedtext hover:text-cream transition-colors";
   const activeCls = "text-cream font-semibold";
 
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
   const [devMode, setDevMode] = useState(false);
+  const [huntActive, setHuntActive] = useState(false);
+  
   useEffect(() => {
     setDevMode(localStorage.getItem('devMode') === 'true');
+    const checkHunt = () => {
+      setHuntActive(localStorage.getItem('agentapply_hunt_started') === 'true');
+    };
+    checkHunt();
+    const interval = setInterval(checkHunt, 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleDevModeToggle = () => {
     const newMode = !devMode;
     localStorage.setItem('devMode', String(newMode));
     window.location.reload();
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate({ to: "/" });
   };
 
   return (
@@ -139,9 +157,23 @@ function Navbar() {
         </Link>
         <div className="flex items-center gap-6">
           <Link to="/" className={linkCls} activeOptions={{ exact: true }} activeProps={{ className: activeCls }}>Home</Link>
-          <Link to="/hunt" className={linkCls} activeProps={{ className: activeCls }}>My Hunt</Link>
-          <Link to="/community" className={linkCls} activeProps={{ className: activeCls }}>Community</Link>
-          <Link to="/profile" className={linkCls} activeProps={{ className: activeCls }}>Profile</Link>
+          
+          {user && (
+            <>
+              <Link to="/hunt" className={`relative ${linkCls}`} activeProps={{ className: activeCls }}>
+                My Hunt
+                {huntActive && (
+                  <span className="absolute -right-2.5 -top-1 flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-terracotta opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-terracotta"></span>
+                  </span>
+                )}
+              </Link>
+              <Link to="/community" className={linkCls} activeProps={{ className: activeCls }}>Community</Link>
+              <Link to="/profile" className={linkCls} activeProps={{ className: activeCls }}>Profile</Link>
+            </>
+          )}
+
           {import.meta.env.DEV && (
             <div className="ml-4 flex items-center gap-2 border-l border-cardborder pl-4">
               <span className="text-xs text-mutedtext">Dev Mode</span>
@@ -153,6 +185,31 @@ function Navbar() {
               </button>
             </div>
           )}
+
+          <div className="flex items-center gap-4 border-l border-cardborder pl-4">
+            {user ? (
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-cream">{user.name || user.email}</span>
+                <button
+                  onClick={handleLogout}
+                  className="rounded-card border border-cardborder bg-cardbg px-3 py-1.5 text-xs font-semibold text-terracotta hover:bg-cardbg-hover transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <Link to="/login" className={linkCls} activeProps={{ className: activeCls }}>Login</Link>
+                <Link
+                  to="/register"
+                  className="rounded-card bg-terracotta px-3 py-1.5 text-xs font-semibold text-darkbg hover:opacity-90 transition-opacity"
+                >
+                  Register
+                </Link>
+              </div>
+            )}
+          </div>
+          
           <LLMStatusPill />
         </div>
       </nav>
@@ -164,21 +221,23 @@ function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
     <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen bg-darkbg text-cream">
-        <Navbar />
-        <Outlet />
-        <Toaster
-          theme="dark"
-          position="top-right"
-          toastOptions={{
-            style: {
-              background: "#2C1F1A",
-              border: "1px solid rgba(224, 122, 95, 0.3)",
-              color: "#F4F1DE",
-            },
-          }}
-        />
-      </div>
+      <AuthProvider>
+        <div className="min-h-screen bg-darkbg text-cream">
+          <Navbar />
+          <Outlet />
+          <Toaster
+            theme="dark"
+            position="top-right"
+            toastOptions={{
+              style: {
+                background: "#2C1F1A",
+                border: "1px solid rgba(224, 122, 95, 0.3)",
+                color: "#F4F1DE",
+              },
+            }}
+          />
+        </div>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

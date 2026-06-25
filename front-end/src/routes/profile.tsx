@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect, type FormEvent } from "react";
 import { toast } from "sonner";
+import { useAuth } from "../context/AuthContext";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -9,29 +11,47 @@ export const Route = createFileRoute("/profile")({
       { name: "description", content: "Manage your profile." },
     ],
   }),
-  component: Profile,
+  component: ProfilePage,
 });
 
+function ProfilePage() {
+  return (
+    <ProtectedRoute>
+      <Profile />
+    </ProtectedRoute>
+  );
+}
+
 function Profile() {
-  const [email, setEmail] = useState("Loading...");
-  const [role, setRole] = useState(localStorage.getItem('profileRole') || "");
-  const [location, setLocation] = useState(localStorage.getItem('profileLocation') || "");
+  const { user, updateUserPreferences } = useAuth();
+  
+  // Set defaults from preferences if they exist, otherwise fall back to localStorage
+  const defaultRole = user?.preferences?.role || localStorage.getItem('profileRole') || "";
+  const defaultLoc = user?.preferences?.location || localStorage.getItem('profileLocation') || "";
+
+  const [role, setRole] = useState(defaultRole);
+  const [location, setLocation] = useState(defaultLoc);
 
   useEffect(() => {
-    fetch('http://localhost:8000/api/user/profile')
-      .then(r => r.json())
-      .then(d => setEmail(d.email || 'No email found in .env'))
-      .catch(() => setEmail('Failed to load'));
-  }, []);
+    if (user?.preferences) {
+      setRole(user.preferences.role || "");
+      setLocation(user.preferences.location || "");
+    }
+  }, [user]);
 
-  const onSubmit = (e: FormEvent) => {
+  const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    localStorage.setItem('profileRole', role);
-    localStorage.setItem('profileLocation', location);
-    toast.success("Profile saved locally");
+    try {
+      await updateUserPreferences(role, location);
+      localStorage.setItem('profileRole', role);
+      localStorage.setItem('profileLocation', location);
+      toast.success("Preferences saved successfully!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to save preferences");
+    }
   };
 
-  const field = "w-full rounded-card border border-cardborder bg-darkbg px-4 py-3 text-sm text-cream placeholder:text-mutedtext focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/40";
+  const field = "w-full rounded-card border border-cardborder bg-darkbg px-4 py-3 text-sm text-cream placeholder:text-mutedtext focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/40 transition-colors";
 
   return (
     <main className="mx-auto max-w-xl px-6 py-16">
@@ -40,21 +60,38 @@ function Profile() {
 
       <form onSubmit={onSubmit} className="mt-8 space-y-5 rounded-column border border-cardborder bg-cardbg p-6">
         <div>
-          <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Sending Email (from .env)</label>
-          <input className={field} value={email} readOnly />
+          <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Name</label>
+          <input className={`${field} opacity-70`} value={user?.name || ""} readOnly disabled />
+        </div>
+        <div>
+          <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Email Address</label>
+          <input className={`${field} opacity-70`} value={user?.email || ""} readOnly disabled />
         </div>
         <div>
           <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Default Role</label>
-          <input type="text" className={field} value={role} onChange={(e) => setRole(e.target.value)} placeholder="e.g. Software Engineer" />
+          <input 
+            type="text" 
+            className={field} 
+            value={role} 
+            onChange={(e) => setRole(e.target.value)} 
+            placeholder="e.g. Software Engineer" 
+          />
         </div>
         <div>
           <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Default Location</label>
-          <input type="text" className={field} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Remote" />
+          <input 
+            type="text" 
+            className={field} 
+            value={location} 
+            onChange={(e) => setLocation(e.target.value)} 
+            placeholder="e.g. Remote" 
+          />
         </div>
-        <button type="submit" className="w-full rounded-card bg-terracotta px-4 py-3 text-sm font-bold uppercase tracking-wider text-darkbg transition-transform hover:scale-[1.01] hover:shadow-[var(--shadow-glow)]">
+        <button type="submit" className="w-full rounded-card bg-terracotta px-4 py-3 text-sm font-bold uppercase tracking-wider text-darkbg transition-transform hover:scale-[1.01] hover:shadow-[var(--shadow-glow)] active:scale-[0.99]">
           Save Defaults
         </button>
       </form>
     </main>
   );
 }
+export default ProfilePage;

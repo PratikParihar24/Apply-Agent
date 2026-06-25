@@ -8,6 +8,8 @@ import {
   generateForCompany,
   sendApplication,
 } from "../api/client";
+import ProtectedRoute from "../components/ProtectedRoute";
+import { useAuth } from "../context/AuthContext";
 
 export const Route = createFileRoute("/hunt")({
   head: () => ({
@@ -16,10 +18,19 @@ export const Route = createFileRoute("/hunt")({
       { name: "description", content: "Live 3-column dashboard of your job hunt." },
     ],
   }),
-  component: HuntPage,
+  component: HuntPageWrapper,
 });
 
-type Status = "searching" | "generating" | "ready" | "sent";
+function HuntPageWrapper() {
+  return (
+    <ProtectedRoute>
+      <HuntPage />
+    </ProtectedRoute>
+  );
+}
+
+
+type Status = "searching" | "generating" | "ready" | "sending" | "sent";
 
 interface Company {
   id: number | string;
@@ -67,11 +78,51 @@ const emptyBrief: HuntBrief = {
 };
 
 function HuntPage() {
-  const [brief, setBrief] = useState<HuntBrief>(emptyBrief);
-  const [started, setStarted] = useState(false);
-  const [cards, setCards] = useState<Card[]>([]);
+  const { user } = useAuth();
+  const [brief, setBrief] = useState<HuntBrief>(() => {
+    return {
+      ...emptyBrief,
+      targetRole: localStorage.getItem('agentapply_hunt_role') || "",
+      location: localStorage.getItem('agentapply_hunt_location') || "",
+    };
+  });
+
+  useEffect(() => {
+    if (user?.preferences) {
+      setBrief((prev) => ({
+        ...prev,
+        targetRole: prev.targetRole || user.preferences?.role || "",
+        location: prev.location || user.preferences?.location || "",
+      }));
+    }
+  }, [user]);
+
+  const [started, setStarted] = useState(() => {
+    return localStorage.getItem('agentapply_hunt_started') === 'true';
+  });
+  const [cards, setCards] = useState<Card[]>(() => {
+    const saved = localStorage.getItem('agentapply_hunt_state');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return []; }
+    }
+    return [];
+  });
   const [popupCardId, setPopupCardId] = useState<string | number | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
   const indexRef = useRef(0);
+
+  useEffect(() => {
+    localStorage.setItem('agentapply_hunt_state', JSON.stringify(cards));
+  }, [cards]);
+
+  useEffect(() => {
+    localStorage.setItem('agentapply_hunt_role', brief.targetRole);
+    localStorage.setItem('agentapply_hunt_location', brief.location);
+  }, [brief.targetRole, brief.location]);
+
+  useEffect(() => {
+    localStorage.setItem('agentapply_hunt_started', String(started));
+  }, [started]);
 
   useEffect(() => {
     if (started) {
@@ -120,7 +171,7 @@ function HuntPage() {
     const c = cards.find((x) => String(x.id) === String(id));
     if (!c) return;
 
-    updateCard(id, { status: "sent", sentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
+    updateCard(id, { status: "sending" });
     try {
       const payload = {
         cover_letter: c.coverLetter,
@@ -131,6 +182,7 @@ function HuntPage() {
       };
       const res = await sendApplication(String(id), payload);
       if (res.success) {
+        updateCard(id, { status: "sent", sentAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
         toast.success(`Application sent to ${c.name}!`);
       } else {
         throw new Error(res.status || "Unknown error");
@@ -143,9 +195,15 @@ function HuntPage() {
   };
 
   const handleReset = () => {
+    localStorage.removeItem('agentapply_hunt_state');
+    localStorage.removeItem('agentapply_hunt_role');
+    localStorage.removeItem('agentapply_hunt_location');
+    localStorage.removeItem('agentapply_hunt_started');
     indexRef.current = 0;
     setCards([]);
     setStarted(false);
+    setBrief(emptyBrief);
+    setShowResetModal(false);
   };
 
   const handleStart = async () => {
@@ -179,14 +237,14 @@ function HuntPage() {
   };
 
   if (!started) {
-    return <SetupForm brief={brief} setBrief={setBrief} onStart={handleStart} />;
+    return <SetupForm brief={brief} setBrief={setBrief} onStart={handleStart} onCancel={cards.length > 0 ? () => setStarted(true) : undefined} />;
   }
 
   const searching = cards
     .filter((c) => c.status === "searching")
     .sort((a, b) => b.score - a.score);
   const generating = cards.filter((c) => c.status === "generating");
-  const ready = cards.filter((c) => c.status === "ready");
+  const ready = cards.filter((c) => c.status === "ready" || c.status === "sending");
   const sent = cards.filter((c) => c.status === "sent");
 
   const popupCard = popupCardId ? cards.find(c => String(c.id) === String(popupCardId)) : null;
@@ -209,12 +267,22 @@ function HuntPage() {
             · <span className="text-sand">{brief.workMode}</span>
           </p>
         </div>
-        <button
-          onClick={handleReset}
-          className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
-        >
-          Edit Brief
-        </button>
+        <div className="flex gap-3">
+          {started && (
+            <button
+              onClick={() => setShowResetModal(true)}
+              className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-terracotta hover:border-terracotta"
+            >
+              New Hunt
+            </button>
+          )}
+          <button
+            onClick={() => setStarted(false)}
+            className="rounded-card border border-cardborder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:text-cream"
+          >
+            Edit Brief
+          </button>
+        </div>
       </div>
 
       <BriefChips brief={brief} />
@@ -257,6 +325,30 @@ function HuntPage() {
         onSkip={() => { setPopupCardId(null); handleSkip(popupCard.id); }} 
       />
     )}
+    {showResetModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-darkbg/80 p-4 backdrop-blur-sm">
+        <div className="relative w-full max-w-sm rounded-card border border-terracotta bg-cardbg p-6 shadow-[var(--shadow-glow)] text-center" style={{ animation: "var(--animate-slide-in)" }}>
+          <h2 className="text-xl font-bold text-cream mb-2">Start a New Hunt?</h2>
+          <p className="text-sm text-mutedtext mb-6">
+            This will clear your current search and all generated drafts. Do you want to continue?
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowResetModal(false)}
+              className="flex-1 rounded-card border border-cardborder px-4 py-2.5 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-cream"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleReset}
+              className="flex-1 rounded-card bg-terracotta px-4 py-2.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90"
+            >
+              Yes, Clear It
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
     </>
   );
 }
@@ -265,10 +357,12 @@ function SetupForm({
   brief,
   setBrief,
   onStart,
+  onCancel,
 }: {
   brief: HuntBrief;
   setBrief: (b: HuntBrief) => void;
   onStart: () => void;
+  onCancel?: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
 
@@ -404,13 +498,23 @@ function SetupForm({
           />
         </div>
 
-        <button
-          onClick={submit}
-          disabled={!canStart}
-          className="w-full rounded-card bg-terracotta px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-all hover:scale-[1.01] hover:shadow-[var(--shadow-glow-strong)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none"
-        >
-          Start the Hunt →
-        </button>
+        <div className="flex gap-4">
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="w-1/3 rounded-card border border-cardborder px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-mutedtext transition-all hover:text-cream hover:border-terracotta"
+            >
+              Cancel
+            </button>
+          )}
+          <button
+            onClick={submit}
+            disabled={!canStart}
+            className={`${onCancel ? 'w-2/3' : 'w-full'} rounded-card bg-terracotta px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-all hover:scale-[1.01] hover:shadow-[var(--shadow-glow-strong)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none`}
+          >
+            {onCancel ? 'Add to Hunt →' : 'Start the Hunt →'}
+          </button>
+        </div>
       </div>
     </main>
   );
@@ -636,6 +740,7 @@ function ReadyCard({
   const [editing, setEditing] = useState(false);
   const [showResume, setShowResume] = useState(false);
   const isSent = card.status === "sent";
+  const isSending = card.status === "sending";
 
   return (
     <article
@@ -713,11 +818,12 @@ function ReadyCard({
             </button>
             <button
               onClick={() => onSend(card.id)}
-              disabled={isSent}
+              disabled={isSent || isSending}
               className="flex-1 rounded-card bg-terracotta px-3 py-2 text-xs font-bold uppercase tracking-wider text-darkbg transition-all hover:shadow-[var(--shadow-glow-strong)] disabled:opacity-50"
             >
-              {isSent ? "Sent ✓" : "Send Application"}
+              {isSent ? "Sent ✓" : isSending ? "Sending..." : "Send"}
             </button>
+
           </div>
         </div>
       )}
