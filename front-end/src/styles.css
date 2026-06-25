@@ -1,0 +1,87 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-darkbg: #1A1410;
+  --color-cardbg: #2C1F1A;
+  --color-cardbg-hover: #3D2C24;
+  --color-cream: #F4F1DE;
+  --color-mutedtext: #A8988A;
+  --color-terracotta: #E07A5F;
+  --color-sand: #F2CC8F;
+  --color-sage: #81B29A;
+  --color-cardborder: rgba(224, 122, 95, 0.15);
+
+  --color-background: #1A1410;
+  --color-foreground: #F4F1DE;
+  --color-card: #2C1F1A;
+  --color-card-foreground: #F4F1DE;
+  --color-popover: #2C1F1A;
+  --color-popover-foreground: #F4F1DE;
+  --color-primary: #E07A5F;
+  --color-primary-foreground: #1A1410;
+  --color-secondary: #3D2C24;
+  --color-secondary-foreground: #F4F1DE;
+  --color-muted: #2C1F1A;
+  --color-muted-foreground: #A8988A;
+  --color-accent: #F2CC8F;
+  --color-accent-foreground: #1A1410;
+  --color-destructive: #c0392b;
+  --color-destructive-foreground: #F4F1DE;
+  --color-border: rgba(224, 122, 95, 0.15);
+  --color-input: rgba(224, 122, 95, 0.25);
+  --color-ring: #E07A5F;
+
+  --radius-card: 16px;
+  --radius-column: 24px;
+
+  --shadow-glow: 0 8px 32px rgba(224, 122, 95, 0.2);
+  --shadow-glow-strong: 0 8px 48px rgba(224, 122, 95, 0.4);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --animate-slide-in: slideIn 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-pulse-shimmer: pulseShimmer 2s ease-in-out infinite;
+  --animate-bounce-glow: bounceGlow 1.8s ease-in-out infinite;
+  --animate-scale-out: scaleOut 0.3s ease-in forwards;
+}
+
+@keyframes slideIn {
+  0% { transform: translateY(20px) scale(0.96); opacity: 0; }
+  100% { transform: translateY(0) scale(1); opacity: 1; }
+}
+@keyframes pulseShimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes bounceGlow {
+  0%, 100% { box-shadow: 0 0 20px rgba(129, 178, 154, 0.25); }
+  50% { box-shadow: 0 0 40px rgba(129, 178, 154, 0.55); }
+}
+@keyframes scaleOut {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(0.9); opacity: 0; }
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  html, body {
+    background-color: var(--color-darkbg);
+    color: var(--color-cream);
+    font-family: var(--font-sans);
+  }
+}
+
+@utility shimmer-bg {
+  background: linear-gradient(
+    90deg,
+    var(--color-cardbg) 0%,
+    rgba(242, 204, 143, 0.18) 50%,
+    var(--color-cardbg) 100%
+  );
+  background-size: 200% 100%;
+  animation: pulseShimmer 2s ease-in-out infinite;
+}
