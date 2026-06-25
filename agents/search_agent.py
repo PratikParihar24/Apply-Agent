@@ -103,17 +103,19 @@ class SearchAgent:
 
     def search_stream(self, role: str, location: str, resume_summary_text: str, on_result_callback):
         """
-        Runs 4 parallel queries. As each query yields results, it scores them 
-        instantly and calls on_result_callback.
+        Runs 6 parallel queries targeting actual companies.
+        As each query yields results, it scores them instantly and calls on_result_callback.
         """
         from agents.shortlister_agent import ShortlisterAgent
         import concurrent.futures
         
         queries = [
-            f'{role} internship {location} site:linkedin.com/jobs',
-            f'{role} hiring {location} site:instahyre.com OR site:naukri.com OR site:wellfound.com',
-            f'"{role}" job opening {location} -site:glassdoor.com -site:indeed.com',
-            f'{role} we are hiring {location} 2025 2026',
+            f'{role} internship {location} company hiring 2025 -site:naukri.com -site:glassdoor.com -site:indeed.com',
+            f'"{role}" opening {location} "apply" OR "careers" OR "we are hiring" -job board',
+            f'startups {location} hiring {role} 2025 site:wellfound.com OR site:linkedin.com/company',
+            f'{role} {location} "send your resume" OR "email your cv" OR "careers@" OR "hr@"',
+            f'"{location}" tech companies hiring "{role}" internship filetype:html',
+            f'{role} fresher internship {location} "contact us" OR "apply now" site:*.in OR site:*.com',
         ]
         
         seen_companies = set()
@@ -128,16 +130,18 @@ class SearchAgent:
                         for r in ddgs.text(query, max_results=5):
                             url = r.get("href", "")
                             title = r.get("title", "")
+                            body = r.get("body", "")
                             
-                            if "linkedin.com/company/" in url:
-                                slug_match = re.search(r"linkedin\.com/company/([^/]+)", url)
-                                if slug_match:
-                                    company = slug_match.group(1).replace("-", " ").title()
-                                    job_title, _ = self._parse_title(title)
-                                else:
-                                    job_title, company = self._parse_title(title)
-                            else:
-                                job_title, company = self._parse_title(title)
+                            job_title, company = self._parse_title(title)
+                            
+                            # Email extraction
+                            email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', body)
+                            hr_email = email_match.group(0) if email_match else None
+                            
+                            # Website extraction
+                            job_boards = ['naukri.com', 'glassdoor.com', 'indeed.com', 'linkedin.com', 'internshala.com', 'wellfound.com']
+                            is_job_board = any(jb in url.lower() for jb in job_boards)
+                            website = None if is_job_board else url
                                 
                             comp_key = company.lower()
                             if comp_key not in seen_companies:
@@ -145,9 +149,11 @@ class SearchAgent:
                                 job_dict = {
                                     "company": company,
                                     "job_title": job_title,
-                                    "url": url,
-                                    "description": r.get("body", ""),
-                                    "source": "duckduckgo"
+                                    "website": website,
+                                    "description": body,
+                                    "hr_email": hr_email,
+                                    "apply_url": url,
+                                    "source": query
                                 }
                                 
                                 # Score instantly
@@ -162,7 +168,7 @@ class SearchAgent:
                     if attempts < max_attempts:
                         time.sleep(2)
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             futures = [executor.submit(_run_query, q) for q in queries]
             concurrent.futures.wait(futures)
 

@@ -29,6 +29,10 @@ interface Company {
   description?: string;
   desc?: string; // Fallback for UI mapping
   score: number;
+  website?: string | null;
+  hr_email?: string | null;
+  apply_url?: string;
+  source?: string;
 }
 
 interface Card extends Company {
@@ -66,6 +70,7 @@ function HuntPage() {
   const [brief, setBrief] = useState<HuntBrief>(emptyBrief);
   const [started, setStarted] = useState(false);
   const [cards, setCards] = useState<Card[]>([]);
+  const [popupCardId, setPopupCardId] = useState<string | number | null>(null);
   const indexRef = useRef(0);
 
   useEffect(() => {
@@ -86,7 +91,12 @@ function HuntPage() {
   const updateCard = (id: number | string, patch: Partial<Card>) =>
     setCards((prev) => prev.map((c) => (String(c.id) === String(id) ? { ...c, ...patch } : c)));
 
-  const handleReview = async (id: number | string) => {
+  const handleOpenPopup = (id: number | string) => {
+    setPopupCardId(id);
+  };
+
+  const handleGenerate = async (id: number | string) => {
+    setPopupCardId(null);
     updateCard(id, { status: "generating" });
     try {
       const result = await generateForCompany(String(id));
@@ -178,8 +188,11 @@ function HuntPage() {
   const ready = cards.filter((c) => c.status === "ready");
   const sent = cards.filter((c) => c.status === "sent");
 
+  const popupCard = popupCardId ? cards.find(c => String(c.id) === String(popupCardId)) : null;
+
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
+    <>
+    <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 relative">
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <h1 className="text-3xl font-extrabold text-cream">My Hunt</h1>
@@ -208,7 +221,7 @@ function HuntPage() {
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-4">
         <Column title="Searching" count={searching.length} accent="terracotta">
           {searching.map((c) => (
-            <JobCard key={c.id} card={c} onReview={handleReview} onSkip={handleSkip} />
+            <JobCard key={c.id} card={c} onReview={handleOpenPopup} onSkip={handleSkip} />
           ))}
           {searching.length === 0 && <EmptyHint text="Scouting roles for you…" />}
         </Column>
@@ -235,6 +248,15 @@ function HuntPage() {
         </Column>
       </div>
     </main>
+    {popupCard && (
+      <CompanyDetailPopup 
+        card={popupCard as Card} 
+        onClose={() => setPopupCardId(null)} 
+        onGenerate={() => handleGenerate(popupCard.id)} 
+        onSkip={() => { setPopupCardId(null); handleSkip(popupCard.id); }} 
+      />
+    )}
+    </>
   );
 }
 
@@ -740,6 +762,107 @@ function Field({
           editing ? "border-terracotta focus:ring-2 focus:ring-terracotta/40" : "border-cardborder"
         }`}
       />
+    </div>
+  );
+}
+
+function CompanyDetailPopup({
+  card,
+  onClose,
+  onGenerate,
+  onSkip,
+}: {
+  card: Card;
+  onClose: () => void;
+  onGenerate: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-darkbg/80 p-4 backdrop-blur-sm">
+      <div 
+        className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-card border border-terracotta bg-cardbg p-6 shadow-[var(--shadow-glow)]"
+        style={{ animation: "var(--animate-slide-in)" }}
+      >
+        <button 
+          onClick={onClose}
+          className="absolute left-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-mutedtext transition-colors hover:bg-cardbg-hover hover:text-cream"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+
+        <div className="mt-8 mb-4 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-bold text-cream">{card.name}</h2>
+            <p className="text-sm font-semibold text-terracotta mt-1">{card.role}</p>
+          </div>
+          <ScoreBadge score={card.score} />
+        </div>
+
+        <div className="mb-6 rounded-column bg-darkbg p-4 text-sm text-mutedtext leading-relaxed whitespace-pre-wrap">
+          {card.desc || "No description provided."}
+        </div>
+
+        <div className="mb-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-column border border-cardborder p-4">
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-sand">HR Contact</h4>
+            {card.hr_email ? (
+              <div className="flex items-center gap-2">
+                <a href={`mailto:${card.hr_email}`} className="text-sm text-terracotta hover:underline font-semibold break-all">
+                  {card.hr_email}
+                </a>
+                <button 
+                  onClick={() => { navigator.clipboard.writeText(card.hr_email!); toast.success("Email copied!"); }}
+                  className="p-1 rounded bg-darkbg text-mutedtext hover:text-cream transition-colors"
+                  title="Copy email"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                </button>
+              </div>
+            ) : (
+              <p className="text-sm text-mutedtext italic">Not found in search results</p>
+            )}
+          </div>
+          <div className="rounded-column border border-cardborder p-4 flex flex-col gap-2">
+            <h4 className="mb-1 text-xs font-bold uppercase tracking-wider text-sand">Ways to Apply</h4>
+            {card.website && (
+              <a href={card.website} target="_blank" rel="noreferrer" className="text-sm text-cream hover:text-terracotta transition-colors flex items-center gap-1 w-fit">
+                Visit Company Website ↗
+              </a>
+            )}
+            {(card.apply_url || (card as any).url) && (
+              <a href={card.apply_url || (card as any).url} target="_blank" rel="noreferrer" className="text-sm text-mutedtext hover:text-cream transition-colors flex items-center gap-1 w-fit">
+                View Job Posting ↗
+              </a>
+            )}
+            {!card.website && !card.apply_url && !(card as any).url && (
+              <p className="text-sm text-mutedtext">No source URL provided.</p>
+            )}
+          </div>
+        </div>
+
+        {!card.hr_email && (
+          <p className="text-xs text-mutedtext text-center italic mb-4">
+            No direct email found — you can still generate content and apply via the posting.
+          </p>
+        )}
+
+        <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-cardborder">
+          <button
+            onClick={onSkip}
+            className="rounded-card border border-cardborder px-4 py-2 text-sm font-semibold uppercase tracking-wider text-mutedtext transition-colors hover:border-terracotta hover:text-terracotta"
+          >
+            Skip
+          </button>
+          <button
+            onClick={onGenerate}
+            className="rounded-card bg-terracotta px-6 py-2 text-sm font-bold uppercase tracking-wider text-darkbg transition-colors hover:bg-opacity-90"
+          >
+            {card.hr_email ? "Generate Email & Apply" : "Generate & Apply"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

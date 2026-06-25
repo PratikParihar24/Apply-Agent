@@ -64,14 +64,14 @@ Agent-apply/
 - `get_active_llm_info() -> dict`: Detects and returns information about the currently active LLM (provider, model name, and type: local vs cloud).
 
 ### 2a. `api/main.py`
-**Purpose**: Exposes the backend capabilities as REST and SSE streaming endpoints.
+**Purpose**: Exposes the backend capabilities as REST and SSE streaming endpoints. (Note: Many endpoints use `def` instead of `async def` to offload CPU-bound tasks and avoid asyncio event loop deadlocks).
 **Endpoints**:
 - `POST /api/resume/upload`: Parses resume and returns sections/summary.
 - `POST /api/hunt/start`: Generates a `job_id`, initializes a background thread for parallel searching/scoring, and returns immediately.
 - `GET /api/hunt/stream/{job_id}`: SSE endpoint that streams companies directly to the frontend as soon as they are found and scored.
 - `POST /api/generate/{company_id}`: Generates tailored resume, cover letter, and email body.
 - `POST /api/send/{company_id}`: Sends the final application via email.
-- `GET /api/llm/status`: Returns current LLM status for the frontend UI.
+- `GET /api/llm/status`: Returns current LLM status for the frontend UI status pill.
 
 ### 3. `core/embedder.py`
 **Purpose**: Handles vector embeddings for text chunks using `sentence-transformers`.
@@ -100,19 +100,18 @@ Agent-apply/
     - `is_ready(self) -> bool`: Checks if the vector DB has loaded documents.
 
 ### 5. `agents/search_agent.py`
-**Purpose**: Uses DuckDuckGo search (DDGS) to find job postings online based on role and location.
+**Purpose**: Uses DuckDuckGo search (DDGS) to find target companies directly online based on role and location, bypassing generic job boards.
 **Classes**:
 - `class SearchAgent`:
   - **Methods**:
-    - `search(self, role: str, location: str) -> list[dict]`: Executes 4 specialized queries in parallel using `ThreadPoolExecutor`. Extracts company names directly from LinkedIn URLs or falls back to title parsing, then deduplicates.
-    - `search_stream(self, role, location, resume_summary_text, on_result_callback)`: Calls `search()`, iterates through results, scores them using the ShortlisterAgent instantly, and triggers the callback to stream them out via `api/main.py`.
+    - `search_stream(self, role, location, resume_summary_text, on_result_callback)`: Executes 6 highly targeted queries in parallel using `ThreadPoolExecutor` to find actual companies hiring. Extracts `hr_email` using regex, and smartly sets `website` if the source is not a generic job board. Scores them instantly and triggers the callback to stream them out via `api/main.py`.
 
 ### 6. `agents/shortlister_agent.py`
 **Purpose**: Evaluates and scores the fit between the parsed resume summary and the scraped job descriptions.
 **Classes**:
 - `class ShortlisterAgent`:
   - **Methods**:
-    - `shortlist(self, companies: list[dict], resume_summary: str, top_n: int) -> list[dict]`: Uses the LLM Router to prompt for a 1-10 match score between the candidate and the job description. Returns the top `n` companies sorted by score.
+    - `shortlist_stream(self, companies: list[dict], resume_summary: str) -> list[dict]`: Uses a fast, non-blocking keyword match heuristic (`_quick_score`) to instantly score the fit between the candidate and the job description (1-10 scale), skipping LLM overhead for performance.
 
 ### 7. `agents/tailor_agent.py`
 **Purpose**: Retrieves relevant resume chunks using `resume_processor` and dynamically organizes them to fit a specific job description. Can optionally use an LLM to rewrite bullet points.
@@ -146,9 +145,9 @@ Agent-apply/
 4. A summary is generated for shortlisting.
 5. **Hunt Initiation**: The user posts to `/api/hunt/start`. The API returns a `job_id` and kicks off a background thread.
 6. The frontend immediately transitions to the dashboard and connects to `GET /api/hunt/stream/{job_id}`.
-7. The backend runs 4 parallel search queries, then scores each job one by one using the LLM, pushing them into a queue.
-8. The SSE endpoint streams these jobs to the frontend in real-time, displaying them in the "Searching" column.
-9. **Review & Application**: The user can "Review" a job (generating materials), edit the resulting application in the "Ready" column, and click "Send Application" to dispatch the email and move it to the "Sent" column.
+7. The backend runs 6 parallel search queries to find company websites and HR emails, scores each job instantly using keyword-matching, and pushes them into a queue.
+8. The SSE endpoint streams these companies to the frontend in real-time, displaying them in the "Searching" column.
+9. **Review & Application**: The user clicks "Review" to open a `CompanyDetailPopup` modal. If they decide to proceed, they click "Generate & Apply" to trigger LLM generation. The result moves to the "Ready" column. After reviewing, clicking "Send Application" dispatches the email and moves it to the "Sent" column.
 
 ## 📌 Development Notes
 - The modules are kept **strictly decoupled**. For instance, `agents/resume_processor.py` relies ONLY on `core/` and `config/`.
