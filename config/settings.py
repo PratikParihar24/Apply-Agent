@@ -10,6 +10,14 @@ GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
 
+# Resend Email Configuration
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+RESEND_FROM_ADDRESS = os.getenv("RESEND_FROM_ADDRESS")
+RESEND_WEBHOOK_SECRET = os.getenv("RESEND_WEBHOOK_SECRET")
+
+# Encryption Key
+SECRET_KEY = os.getenv("SECRET_KEY")
+
 # Hardcoded defaults
 EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 CHROMA_DB_PATH = './data/resume_db'

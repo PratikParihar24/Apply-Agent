@@ -25,6 +25,8 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup_event():
     await init_db()
+    if not os.getenv("RESEND_API_KEY"):
+        print("WARNING: RESEND_API_KEY not set — email sending will fail.")
 
 # Include routers
 app.include_router(auth_router)

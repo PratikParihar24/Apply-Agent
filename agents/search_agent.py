@@ -3,6 +3,9 @@ import sys
 import time
 import random
 import re
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
 from ddgs import DDGS
 
 # Ensure the parent directory is in sys.path so we can import from core and config when running as a script
@@ -12,7 +15,190 @@ from config.settings import MAX_SEARCH_RESULTS
 
 class SearchAgent:
     def __init__(self):
-        pass
+        self._company_cache = {}
+
+    def _find_career_page(self, company_name: str) -> dict:
+        """
+        Finds the company website and career page using DDGS and scraping.
+        Caches results in self._company_cache.
+        """
+        company_key = company_name.lower().strip()
+        if company_key in self._company_cache:
+            return self._company_cache[company_key]
+
+        blocklist = [
+            'linkedin.com', 'indeed.com', 'glassdoor.com', 'naukri.com', 'monster.com',
+            'careerbuilder.com', 'ziprecruiter.com', 'simplyhired.com', 'dice.com',
+            'wellfound.com', 'angel.co', 'shine.com', 'foundit.in', 'timesjobs.com',
+            'freshersworld.com', 'instahyre.com', 'quora.com', 'reddit.com', 'medium.com'
+        ]
+
+        queries = [
+            f'"{company_name}" official website',
+            f'"{company_name}" careers page',
+            f'"{company_name}" jobs apply'
+        ]
+
+        website = ""
+        career_page = ""
+        hr_email = ""
+
+        # Step 1: Run DDGS queries sequentially to find main website
+        for q in queries:
+            try:
+                with DDGS() as ddgs:
+                    for r in ddgs.text(q, max_results=3):
+                        href = r.get("href", "")
+                        if href:
+                            parsed_url = urlparse(href)
+                            netloc = parsed_url.netloc.lower()
+                            if not any(blocked in netloc for blocked in blocklist):
+                                website = f"{parsed_url.scheme}://{parsed_url.netloc}"
+                                break
+                if website:
+                    break
+                time.sleep(1)
+            except Exception as e:
+                print(f"Warning: DDGS error for query '{q}': {e}")
+
+        if not website:
+            res = {"website": "", "career_page": "", "hr_email": ""}
+            self._company_cache[company_key] = res
+            return res
+
+        career_page = website
+
+        # Step 2: Scrape website homepage to find career link
+        soup = None
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/115.0.0.0'
+        }
+        try:
+            response = requests.get(website, timeout=5, headers=headers)
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Look for careers link
+                keywords = ["careers", "jobs", "join us", "work with us"]
+                for link in soup.find_all('a', href=True):
+                    href = link['href']
+                    text = link.get_text().strip().lower()
+                    if any(kw in text for kw in keywords):
+                        career_page = urljoin(website, href)
+                        break
+        except (requests.Timeout, requests.ConnectionError) as e:
+            print(f"Warning: Network timeout/error scraping website homepage for {company_name}: {e}")
+        except Exception as e:
+            print(f"Warning: Unexpected error scraping website homepage for {company_name}: {e}")
+
+        # Step 3: Fallback to path probing if no career link was found
+        if career_page == website:
+            common_paths = ['/careers', '/jobs', '/about/careers', '/join-us']
+            for path in common_paths:
+                test_url = urljoin(website, path)
+                try:
+                    r = requests.head(test_url, timeout=3, headers=headers)
+                    if r.status_code == 200:
+                        career_page = test_url
+                        break
+                except (requests.Timeout, requests.ConnectionError):
+                    pass
+                except Exception:
+                    pass
+
+        # Step 4: Extract emails
+        emails_found = []
+        company_domain = urlparse(website).netloc.replace('www.', '').lower() if website else ""
+
+        # Prioritize mailto hrefs first
+        if soup:
+            for link in soup.find_all('a', href=True):
+                href = link['href']
+                if href.startswith('mailto:'):
+                    email = href.replace('mailto:', '').split('?')[0].strip()
+                    if email and re.match(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', email):
+                        emails_found.append(email)
+
+        # Fallback to regex
+        if soup:
+            text_to_search = soup.get_text()
+            regex_emails = re.findall(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', text_to_search)
+            for email in regex_emails:
+                if email not in emails_found:
+                    emails_found.append(email)
+
+        # Sort and select best email
+        if emails_found:
+            prioritized = []
+            keywords = ['hr', 'career', 'recruit', 'talent', 'jobs']
+            for email in emails_found:
+                email_lower = email.lower()
+                has_keyword = any(kw in email_lower for kw in keywords)
+                has_domain = company_domain and (company_domain in email_lower)
+                
+                score = 0
+                if has_domain:
+                    score += 10
+                if has_keyword:
+                    score += 5
+                
+                prioritized.append((score, email))
+            prioritized.sort(key=lambda x: x[0], reverse=True)
+            hr_email = prioritized[0][1]
+
+        res = {
+            "website": website,
+            "career_page": career_page,
+            "hr_email": hr_email
+        }
+        self._company_cache[company_key] = res
+        return res
+
+    def _scrape_company_description(self, url: str) -> str:
+        """
+        Scrapes company description/mission from About page or meta tags.
+        """
+        if not url:
+            return ""
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/115.0.0.0'
+        }
+
+        # Try to GET About page
+        target_url = url
+        if "about" not in url.lower():
+            target_url = urljoin(url, "/about")
+
+        try:
+            response = requests.get(target_url, timeout=5, headers=headers)
+            # If /about returns 404, fallback to main url
+            if response.status_code != 200 and target_url != url:
+                response = requests.get(url, timeout=5, headers=headers)
+            
+            if response.status_code == 200:
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # Check meta tag description
+                desc_tag = soup.find('meta', attrs={'name': 'description'}) or \
+                           soup.find('meta', attrs={'property': 'og:description'}) or \
+                           soup.find('meta', attrs={'name': 'Description'})
+                if desc_tag and desc_tag.get('content'):
+                    desc_content = desc_tag.get('content').strip()
+                    if len(desc_content) > 10:
+                        return desc_content[:300]
+                
+                # Try finding a paragraph with >50 characters
+                for p in soup.find_all('p'):
+                    p_text = p.get_text().strip()
+                    if len(p_text) > 50:
+                        return p_text[:300]
+        except (requests.Timeout, requests.ConnectionError) as e:
+            print(f"Warning: Network timeout/error fetching description from {url}: {e}")
+        except Exception as e:
+            print(f"Warning: Error fetching description from {url}: {e}")
+
+        return ""
 
     def _parse_title(self, title: str) -> tuple[str, str]:
         """
@@ -144,41 +330,20 @@ class SearchAgent:
                             if comp_key not in seen_companies and comp_key != "unknown company":
                                 seen_companies.add(comp_key)
                                 
-                                # Secondary Search
-                                secondary_query = f'"{company}" official website'
-                                verified_website = None
-                                unverified = False
+                                # Find website and career page using helper
+                                res_find = self._find_career_page(company)
+                                website_val = res_find.get("career_page") or res_find.get("website") or ""
+                                hr_email_val = res_find.get("hr_email") or hr_email
                                 
-                                try:
-                                    with DDGS() as ddgs:
-                                        for r2 in ddgs.text(secondary_query, max_results=3):
-                                            u2 = r2.get("href", "")
-                                            b2 = r2.get("body", "")
-                                            if not any(jb in u2.lower() for jb in job_boards):
-                                                verified_website = u2
-                                                if not hr_email:
-                                                    email_match2 = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', b2)
-                                                    if email_match2:
-                                                        hr_email = email_match2.group(0)
-                                                break
-                                    time.sleep(1)
-                                except Exception:
-                                    pass
-                                    
-                                if not verified_website:
-                                    is_job_board = any(jb in url.lower() for jb in job_boards)
-                                    website = None if is_job_board else url
-                                    unverified = True
-                                else:
-                                    website = verified_website
-
                                 job_dict = {
                                     "company": company,
                                     "job_title": job_title,
-                                    "website": website,
-                                    "unverified": unverified,
+                                    "website": website_val,
+                                    "career_page": res_find.get("career_page", ""),
+                                    "unverified": not bool(website_val),
                                     "description": body,
-                                    "hr_email": hr_email,
+                                    "company_description": "",  # Exclude from stream loop for performance
+                                    "hr_email": hr_email_val,
                                     "apply_url": url,
                                     "source": query
                                 }
