@@ -7,8 +7,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from core.llm_router import get_llm
 
 class TailorAgent:
-    def __init__(self):
-        self.llm = get_llm()
+    def __init__(self, user_settings:dict = None):
+        self.llm, self.provider = get_llm(user_settings)
 
     def tailor(self, company: dict, resume_processor, rewrite: bool = False) -> str:
         """
@@ -56,11 +56,16 @@ class TailorAgent:
             for cat, items in categories.items():
                 for item in items:
                     prompt = (
-                        f"Rewrite the following resume snippet to better highlight skills "
-                        f"relevant to this job description. Keep it truthful but emphasize relevant keywords.\n\n"
+                        f"You are a resume bullet-point editor. Slightly rephrase the snippet below so it highlights skills relevant to the Job Description.\n\n"
+                        f"RULES:\n"
+                        f"- Output ONLY the rewritten snippet. Nothing else.\n"
+                        f"- Keep it approximately the same length as the original (±10 words).\n"
+                        f"- Preserve the original format — if it starts with a dash or bullet, keep it.\n"
+                        f"- Do NOT write a letter, greeting, or sign-off.\n"
+                        f"- Do NOT add conversational filler like 'Sure!' or 'Here you go'.\n"
+                        f"- Stay truthful — rephrase, don't fabricate.\n\n"
                         f"Job Description: {job_desc}\n\n"
-                        f"Resume Snippet: {item['text']}\n\n"
-                        f"Provide only the rewritten text."
+                        f"Resume Snippet: {item['text']}"
                     )
                     try:
                         response = self.llm.invoke(prompt)

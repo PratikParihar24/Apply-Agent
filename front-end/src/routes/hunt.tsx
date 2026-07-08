@@ -73,6 +73,7 @@ interface Card extends Company {
   resume: string;
   subject?: string;
   sentAt?: string;
+  llm_provider?: string;
 }
 
 interface HuntBrief {
@@ -118,6 +119,7 @@ function HuntPage() {
     }
   }, [user]);
 
+  const [isStarting, setIsStarting] = useState(false);
   const [started, setStarted] = useState(() => {
     if (typeof window === "undefined") return false;
     return localStorage.getItem('agentapply_hunt_started') === 'true';
@@ -180,6 +182,7 @@ function HuntPage() {
         emailBody: result.email_body || "",
         resume: result.tailored_resume || "",
         subject: result.subject || "",
+        llm_provider: result.llm_provider || "unknown",
       });
     } catch (error) {
       const e = error as Error;
@@ -230,6 +233,8 @@ function HuntPage() {
   };
 
   const handleStart = async () => {
+    if (isStarting) return;
+    setIsStarting(true);
     try {
       const res = await startHunt(brief.targetRole, brief.location || "Remote", 10, (c) => {
         setCards((prev) => {
@@ -256,11 +261,13 @@ function HuntPage() {
       const e = error as Error;
       toast.error(`Hunt failed to start: ${e.message}`);
       setStarted(false);
+    } finally {
+      setIsStarting(false);
     }
   };
 
   if (!started) {
-    return <SetupForm brief={brief} setBrief={setBrief} onStart={handleStart} onCancel={cards.length > 0 ? () => setStarted(true) : undefined} />;
+    return <SetupForm brief={brief} setBrief={setBrief} onStart={handleStart} isStarting={isStarting} onCancel={cards.length > 0 ? () => setStarted(true) : undefined} />;
   }
 
   const searching = cards
@@ -388,11 +395,13 @@ function SetupForm({
   setBrief,
   onStart,
   onCancel,
+  isStarting = false,
 }: {
   brief: HuntBrief;
   setBrief: (b: HuntBrief) => void;
   onStart: () => void;
   onCancel?: () => void;
+  isStarting?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
 
@@ -539,10 +548,10 @@ function SetupForm({
           )}
           <button
             onClick={submit}
-            disabled={!canStart}
+            disabled={!canStart || isStarting}
             className={`${onCancel ? 'w-2/3' : 'w-full'} rounded-card bg-terracotta px-4 py-3.5 text-sm font-bold uppercase tracking-wider text-darkbg transition-all hover:scale-[1.01] hover:shadow-[var(--shadow-glow-strong)] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:scale-100 disabled:hover:shadow-none btn-ripple`}
           >
-            {onCancel ? 'Add to Hunt →' : 'Start the Hunt →'}
+            {isStarting ? 'Starting...' : (onCancel ? 'Add to Hunt →' : 'Start the Hunt →')}
           </button>
         </div>
       </div>
@@ -773,6 +782,8 @@ function ReadyCard({
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [showResume, setShowResume] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
+
   const isSent = card.status === "sent";
   const isSending = card.status === "sending";
 
@@ -809,7 +820,16 @@ function ReadyCard({
       </button>
 
       {open && (
+        
         <div className="mt-4 space-y-4 border-t border-cardborder pt-4">
+          {showBanner && card.llm_provider && (
+            <LLMBanner 
+              provider={card.llm_provider} 
+              onDismiss={() => {
+                setShowBanner(false);
+              }} 
+            />
+          )}
           <Field
             label="Cover Letter"
             value={card.coverLetter}
@@ -915,6 +935,29 @@ function Field({
           editing ? "border-terracotta focus:ring-2 focus:ring-terracotta/40" : "border-cardborder"
         }`}
       />
+    </div>
+  );
+}
+
+function LLMBanner({ provider, onDismiss }: { provider: string; onDismiss: () => void }) {
+  if (!provider || provider === "unknown") return null;
+  
+  // Choose colors based on the AI model
+  const colors = {
+    gemini: "bg-blue-500/10 border-blue-500/30 text-blue-400",
+    groq: "bg-orange-500/10 border-orange-500/30 text-orange-400",
+    openrouter: "bg-purple-500/10 border-purple-500/30 text-purple-400",
+    ollama: "bg-gray-500/10 border-gray-500/30 text-gray-400",
+    none: "bg-red-500/10 border-red-500/30 text-red-400"
+  };
+  
+  const colorClass = colors[provider as keyof typeof colors] || colors.none;
+  const displayName = provider.charAt(0).toUpperCase() + provider.slice(1);
+
+  return (
+    <div className={`flex items-center justify-between px-3 py-2 rounded mb-3 border ${colorClass} text-xs font-medium`}>
+      <span>✨ Written by <strong>{displayName}</strong></span>
+      <button onClick={onDismiss} className="hover:opacity-70">✕</button>
     </div>
   );
 }

@@ -24,4 +24,6 @@ async def init_db():
     await db.companies.create_index([("hunt_id", 1), ("user_id", 1)])
     await db.community_posts.create_index([("created_at", -1)])
     await db.applications.create_index("user_id")
+    await db.users.create_index("gmail_address")
+
     print("Database collections and indexes initialized successfully.")

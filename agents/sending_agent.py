@@ -1,19 +1,21 @@
 import os
 import base64
 import resend
-from fpdf import FPDF
 from dotenv import load_dotenv
 
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
 load_dotenv(env_path)
 
 class SendingAgent:
-    def send_application(self, company: dict, cover_letter: str, email_body: str, subject: str, tailored_resume: str, user_resend_key: str = None) -> dict:
+    def send_application(self, company: dict, cover_letter: str, email_body: str, subject: str, tailored_resume: str, user_resend_key: str = None, user_id: str = None) -> dict:
         api_key = user_resend_key or os.getenv("RESEND_API_KEY")
         from_address = os.getenv("RESEND_FROM_ADDRESS")
 
         if not api_key or not from_address:
             return {"success": False, "message": "Resend API key or From Address not configured."}
+
+        if not user_id:
+            return {"success": False, "message": "User ID is required to fetch the resume."}
 
         resend.api_key = api_key
 
@@ -21,31 +23,47 @@ class SendingAgent:
         if not recipient:
             domain = company.get("website", "")
             if domain:
-                domain = domain.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
+                domain = domain.replace("https://", "").replace("http://", "").replace("www.", "").split("/")[-1] # fallback logic
                 recipient = f"careers@{domain}"
             else:
                 domain_guess = company.get("company", "").lower().replace(" ", "") + ".com"
                 recipient = f"careers@{domain_guess}"
-
-        # Generate Cover Letter PDF
-        pdf = FPDF()
-        pdf.add_page()
-        pdf.set_font("Helvetica", size=12)
-        pdf.multi_cell(0, 8, text=cover_letter.encode('latin-1', 'replace').decode('latin-1'))
-        cl_pdf_bytes = pdf.output()
-        cl_b64 = base64.b64encode(cl_pdf_bytes).decode('utf-8')
+            
+        recipient = "pheonixpratik24@gmail.com"  # Temporarily override for testing
+  
+        # Read the original resume PDF
+        resume_path = os.path.join(os.path.dirname(__file__), '..', 'data', f'resume_{user_id}.pdf')
+        try:
+            with open(resume_path, "rb") as f:
+                r_pdf_bytes = f.read()
+        except FileNotFoundError:
+            return {"success": False, "message": "Original resume not found. Please re-upload your resume."}
+            
+        # Convert cover letter to HTML paragraphs
+        paragraphs = [p.strip() for p in cover_letter.split("\n") if p.strip()]
+        if paragraphs:
+            # Bold the last line, assuming it's the sign-off name
+            if len(paragraphs[-1]) < 60:
+                paragraphs[-1] = f"<strong>{paragraphs[-1]}</strong>"
+                
+        cl_paragraphs = "".join([f"<p>{p}</p>" for p in paragraphs])
         
-        # Generate Resume PDF
-        r_pdf = FPDF()
-        r_pdf.add_page()
-        r_pdf.set_font("Helvetica", size=11)
-        r_pdf.multi_cell(0, 6, text=tailored_resume.encode('latin-1', 'replace').decode('latin-1'))
-        r_pdf_bytes = r_pdf.output()
-        r_b64 = base64.b64encode(r_pdf_bytes).decode('utf-8')
+        # Build HTML Email
+        html_body = f"""
+        <html>
+          <body style="font-family: Arial, Georgia, sans-serif; background-color: #ffffff; padding: 20px; max-width: 600px; margin: 0 auto; color: #333333; line-height: 1.6;">
+            {cl_paragraphs}
+            <p style="margin-top: 20px;">Please find my resume attached. I look forward to hearing from you.</p>
+          </body>
+        </html>
+        """
+
+        # Check magic bytes to see if it's actually a DOCX file (starts with PK\x03\x04)
+        is_pdf = r_pdf_bytes.startswith(b'%PDF')
+        attachment_filename = "Resume.pdf" if is_pdf else "Resume.docx"
 
         attachments = [
-            {"filename": "Cover_Letter.pdf", "content": cl_b64},
-            {"filename": "Resume.pdf", "content": r_b64}
+            {"filename": attachment_filename, "content": list(r_pdf_bytes)}
         ]
 
         try:
@@ -53,7 +71,7 @@ class SendingAgent:
                 "from": from_address,
                 "to": recipient,
                 "subject": subject,
-                "text": email_body,
+                "html": html_body,
                 "attachments": attachments
             }
             response = resend.Emails.send(params)

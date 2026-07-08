@@ -111,6 +111,4 @@ function Feedback() {
         </form>
       </div>
     </main>
-  );
-}
-export default Feedback;
+  );}

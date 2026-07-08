@@ -11,7 +11,7 @@ from api.routes.auth import router as auth_router
 from api.routes.hunt import router as hunt_router, resume_processor
 from api.routes.resume import router as resume_router
 from api.routes.community import router as community_router
-
+from api.routes.settings import router as settings_router
 app = FastAPI()
 
 app.add_middleware(
@@ -33,6 +33,7 @@ app.include_router(auth_router)
 app.include_router(hunt_router)
 app.include_router(resume_router)
 app.include_router(community_router)
+app.include_router(settings_router)
 
 @app.get("/api/status")
 async def get_status():
@@ -44,9 +45,20 @@ async def get_status():
         "summary_preview": ""
     }
 
+from core.auth import get_current_user_optional
+from core.database import get_db
+from bson import ObjectId
+from fastapi import Depends
+
 @app.get("/api/llm/status")
-def get_llm_status():
-    return get_active_llm_info()
+async def get_llm_status(current_user_id: str = Depends(get_current_user_optional)):
+    settings = {}
+    if current_user_id:
+        db = get_db()
+        user = await db.users.find_one({"_id": ObjectId(current_user_id)})
+        if user:
+            settings = user
+    return get_active_llm_info(settings)
 
 from pydantic import BaseModel
 

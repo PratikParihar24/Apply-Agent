@@ -20,6 +20,9 @@ pymupdf
 langchain-ollama
 
 langchain-google-genai
+langchain-groq
+langchain-openai
+
 
 fastapi
 uvicorn
@@ -31,3 +34,4 @@ passlib[bcrypt]
 resend
 cryptography
 svix
+

@@ -24,7 +24,7 @@ function ProfilePage() {
 
 function Profile() {
   const { user, updateUserPreferences } = useAuth();
-  
+
   const [role, setRole] = useState(() => {
     const isClient = typeof window !== "undefined";
     return user?.preferences?.role || (isClient ? localStorage.getItem('profileRole') || "" : "");
@@ -71,22 +71,22 @@ function Profile() {
         </div>
         <div>
           <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Default Role</label>
-          <input 
-            type="text" 
-            className={field} 
-            value={role} 
-            onChange={(e) => setRole(e.target.value)} 
-            placeholder="e.g. Software Engineer" 
+          <input
+            type="text"
+            className={field}
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            placeholder="e.g. Software Engineer"
           />
         </div>
         <div>
           <label className="mb-2 block text-xs uppercase tracking-wider text-mutedtext">Default Location</label>
-          <input 
-            type="text" 
-            className={field} 
-            value={location} 
-            onChange={(e) => setLocation(e.target.value)} 
-            placeholder="e.g. Remote" 
+          <input
+            type="text"
+            className={field}
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+            placeholder="e.g. Remote"
           />
         </div>
         <button type="submit" className="w-full rounded-card bg-terracotta px-4 py-3 text-sm font-bold uppercase tracking-wider text-darkbg transition-transform hover:scale-[1.01] hover:shadow-[var(--shadow-glow)] active:scale-[0.99]">
@@ -96,4 +96,3 @@ function Profile() {
     </main>
   );
 }
-export default ProfilePage;

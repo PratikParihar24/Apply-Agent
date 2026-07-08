@@ -155,7 +155,14 @@ async def generate_materials(company_id: str, current_user_id: str = Depends(get
         raise HTTPException(status_code=400, detail="No active resume found. Please upload one first.")
         
     resume_summary_text = resume.get("summary", "")
-    
+    2
+    user = await db.users.find_one({"_id": ObjectId(current_user_id)})
+    user_settings = {
+        "preferred_llm": user.get("preferred_llm", "auto"),
+        "ollama_url": user.get("ollama_url", ""),
+        "gemini_api_key": user.get("gemini_api_key", "") # This is safely encrypted in the DB!
+    } if user else {}
+
     # Scrape company description
     company_description = ""
     if company.get("website"):
@@ -171,15 +178,18 @@ async def generate_materials(company_id: str, current_user_id: str = Depends(get
         except Exception as e:
             print(f"Warning: Failed to scrape company description: {e}")
             
-    tailor_agent = TailorAgent()
+    tailor_agent = TailorAgent(user_settings)
     tailored_resume = tailor_agent.tailor(company, resume_processor, rewrite=True)
     
-    writer_agent = WriterAgent()
+    writer_agent = WriterAgent(user_settings)
     result = writer_agent.write(company, resume_summary_text, tailored_resume, company_description=company_description)
     
     cover_letter = result.get("cover_letter", "")
     email_body = result.get("email_body", "")
     subject = result.get("subject", "")
+    
+    # Save the generated content back to the companies collection
+    llm_provider = result.get("llm_provider", "unknown")
     
     # Save the generated content back to the companies collection
     await db.companies.update_one(
@@ -189,6 +199,7 @@ async def generate_materials(company_id: str, current_user_id: str = Depends(get
             "email_body": email_body,
             "subject": subject,
             "tailored_resume": tailored_resume,
+            "llm_provider": llm_provider,
             "status": "generated"
         }}
     )
@@ -197,8 +208,10 @@ async def generate_materials(company_id: str, current_user_id: str = Depends(get
         "cover_letter": cover_letter,
         "email_body": email_body,
         "subject": subject,
-        "tailored_resume": tailored_resume
+        "tailored_resume": tailored_resume,
+        "llm_provider": llm_provider
     }
+
 
 @router.post("/api/send/{company_id}")
 async def send_application(company_id: str, request: SendRequest, current_user_id: str = Depends(get_current_user)):
@@ -219,7 +232,8 @@ async def send_application(company_id: str, request: SendRequest, current_user_i
             email_body=request.email_body,
             subject=request.subject,
             tailored_resume=request.tailored_resume,
-            user_resend_key=user_resend_key
+            user_resend_key=user_resend_key,
+            user_id=current_user_id
         )
         
         # Save to applications collection

@@ -62,3 +62,19 @@ def get_current_user(request: Request) -> str:
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user_id
+
+def get_current_user_optional(request: Request) -> str:
+    auth_header = request.headers.get("Authorization")
+    token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    else:
+        token = request.query_params.get("token")
+        
+    if not token:
+        return None
+    try:
+        payload = decode_jwt(token)
+        return payload.get("sub")
+    except Exception:
+        return None

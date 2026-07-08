@@ -77,3 +77,20 @@ export const getStatus = async (): Promise<any> => {
         method: "GET"
     });
 };
+
+export const getSettings = async(): Promise<any> => {
+    return apiCall("/api/settings", {
+        method: "GET"
+    });
+};
+export const updateSettings = async (payload: any): Promise<any> => {
+    return apiCall("/api/settings", {
+        method: "PUT",
+        body: JSON.stringify(payload)
+    });
+};
+export const deleteSettingsField = async (fieldName: string): Promise<any> => {
+    return apiCall(`/api/settings/field/${fieldName}`, {
+        method: "DELETE"
+    });
+};

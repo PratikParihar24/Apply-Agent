@@ -9,8 +9,9 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from core.llm_router import get_llm
 
 class WriterAgent:
-    def __init__(self):
-        self.llm = get_llm()
+    def __init__(self, user_settings: dict = None):
+        self.llm, self.provider = get_llm(user_settings)
+
 
     def write(self, company: dict, resume_summary: str, tailored_resume: str, company_description: str = "") -> dict:
         """
@@ -27,17 +28,31 @@ class WriterAgent:
         company_description_val = (company_description or company.get("company_description", ""))[:300]
         
         prompt = (
-            f"You are a professional job application writer. Return ONLY a valid JSON object with keys: cover_letter, email_subject, email_body. No markdown, no explanation.\n\n"
-            f"RULES:\n"
-            f"- Use ONLY skills and experiences present in RESUME CONTEXT. Never invent roles or achievements.\n"
-            f"- Cover letter: exactly 3 paragraphs, max 200 words. Structure: (1) why this company specifically, (2) one concrete achievement from the resume that matches the role, (3) call to action.\n"
-            f"- Mention the company description naturally in paragraph 1 if provided.\n"
-            f"- Address at least two specific requirements from the job description.\n"
-            f"- Email subject: under 12 words, include the role name.\n"
-            f"- Email body: 4 sentences max. One sentence must reference a specific achievement from the resume.\n"
-            f"- Tone: direct, human, no buzzwords (do not use: leverage, passionate, synergy, dynamic, results-driven).\n\n"
-            f"EXAMPLE OUTPUT (for reference only, do not copy):\n"
-            f"{{\"cover_letter\": \"Dear Hiring Team at Acme,\\n\\nYour focus on [X from company description] is exactly the kind of problem I've spent the last 3 years solving. At [Previous Company] I built a [specific thing from resume] that [concrete measurable outcome]. I'd bring that same approach to [specific requirement from JD].\\n\\nI also noticed you need [second JD requirement] — my experience with [relevant resume skill] maps directly to this.\\n\\nI'd love to set up a 20-minute call to discuss. I'm available [flexible timing].\\n\\nBest,\\n[Name]\", \"email_subject\": \"Application for [Role] – [Name]\", \"email_body\": \"Hi, I'm applying for the [Role] position. At [company] I [specific achievement]. I've attached my resume and cover letter. Happy to connect at your convenience.\"}}\n\n"
+            f"You are a sharp, no-nonsense job application ghostwriter. "
+            f"Return ONLY a valid JSON object with keys: cover_letter, email_subject, email_body. "
+            f"No markdown fences, no explanation, no preamble.\n\n"
+
+            f"COVER LETTER RULES:\n"
+            f"- 3 short paragraphs. Total 150–220 words. No fluff.\n"
+            f"- Paragraph 1: Open with something specific about the COMPANY — a product, mission, or recent news from the company description. Show you did your homework. Transition into why this role caught your eye.\n"
+            f"- Paragraph 2: Pick ONE concrete achievement from the RESUME that directly maps to a requirement in the JOB DESCRIPTION. Use numbers if the resume has them. Then briefly connect a second JD requirement to another resume skill.\n"
+            f"- Paragraph 3: A confident but not arrogant call to action. Suggest a brief call. Sign off with the applicant's real name (extract it from the resume context — look for the first line or a name-like string).\n"
+            f"- Format: Use '\\n\\n' between paragraphs. Start with 'Dear [Company] Team,' or 'Dear Hiring Team at [Company],'. End with 'Best,\\n[Name]'.\n"
+            f"- NEVER invent roles, companies, metrics, or skills not in the resume.\n"
+            f"- NEVER use these words: leverage, passionate, synergy, dynamic, results-driven, cutting-edge, innovative, thrilled, excited, eager, utilize, spearhead, rockstar, ninja, guru, go-getter.\n"
+            f"- Write like a real human — short sentences, active voice, no corporate jargon.\n\n"
+
+            f"EMAIL SUBJECT RULES:\n"
+            f"- Under 10 words. Include the role name. No emojis.\n"
+            f"- Pattern: 'Application: [Role] — [Name]' or '[Name] — [Role] Application'\n\n"
+
+            f"EMAIL BODY RULES:\n"
+            f"- 3 sentences max. This is the cold-open above the cover letter in the email.\n"
+            f"- Sentence 1: State you are applying for [Role].\n"
+            f"- Sentence 2: One specific achievement from the resume.\n"
+            f"- Sentence 3: 'My resume is attached. Happy to connect at your convenience.'\n"
+            f"- Do NOT mention a cover letter attachment — the cover letter IS the email body.\n\n"
+
             f"RESUME CONTEXT:\n"
             f"{tailored_resume_capped}\n\n"
             f"COMPANY: {company_name}\n"
@@ -72,7 +87,8 @@ class WriterAgent:
             for key in ['cover_letter', 'email_body', 'subject', 'email_subject']:
                 if key not in data:
                     data[key] = ""
-                    
+
+            data["llm_provider"] = self.provider
             return data
             
         except Exception as e:
@@ -86,11 +102,13 @@ class WriterAgent:
                 f"Sincerely,\nApplicant"
             )
             return {
-                "cover_letter": raw_response if raw_response else fallback_cl,
+                "cover_letter": raw_response if 'raw_response' in locals() and raw_response else fallback_cl,
                 "email_body": f"Please find my resume attached for the {job_title} position at {company_name}. I look forward to hearing from you.",
                 "subject": fallback_subject,
-                "email_subject": fallback_subject
+                "email_subject": fallback_subject,
+                "llm_provider": getattr(self, 'provider', 'none')
             }
+
 
 if __name__ == '__main__':
     agent = WriterAgent()
