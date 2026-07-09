@@ -2,10 +2,6 @@ import os
 import sys
 import re
 import uuid
-import pypdf
-import pdfplumber
-import chromadb
-import fitz
 
 # Ensure the parent directory is in sys.path so we can import from core and config when running as a script
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -17,20 +13,33 @@ from config.settings import CHROMA_DB_PATH, CHUNK_SIZE, CHUNK_OVERLAP
 class ResumeProcessor:
     def __init__(self):
         """
-        Initializes the ResumeProcessor, loads the embedder implicitly via core/embedder.py,
-        and connects to ChromaDB at the path from config/settings.py.
+        Initializes the ResumeProcessor. Chroma client and collection will be loaded lazily.
         """
-        os.makedirs(CHROMA_DB_PATH, exist_ok=True)
-        self.chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
-        self.collection = self.chroma_client.get_or_create_collection(
-            name="resume_chunks",
-            metadata={"hnsw:space": "cosine"}
-        )
+        self._chroma_client = None
+        self._collection = None
+
+    @property
+    def chroma_client(self):
+        if self._chroma_client is None:
+            import chromadb
+            os.makedirs(CHROMA_DB_PATH, exist_ok=True)
+            self._chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        return self._chroma_client
+
+    @property
+    def collection(self):
+        if self._collection is None:
+            self._collection = self.chroma_client.get_or_create_collection(
+                name="resume_chunks",
+                metadata={"hnsw:space": "cosine"}
+            )
+        return self._collection
 
     def _extract_text(self, pdf_path: str) -> str:
         """Extracts text using pypdf, falls back to pdfplumber, then pymupdf."""
         text = ""
         try:
+            import pypdf
             with open(pdf_path, "rb") as f:
                 reader = pypdf.PdfReader(f)
                 for page in reader.pages:
@@ -44,6 +53,7 @@ class ResumeProcessor:
             print("Falling back to pdfplumber...")
             text = "" # Reset text
             try:
+                import pdfplumber
                 with pdfplumber.open(pdf_path) as pdf:
                     for page in pdf.pages:
                         page_text = page.extract_text()
@@ -56,6 +66,7 @@ class ResumeProcessor:
             print("Falling back to pymupdf...")
             text = "" # Reset text
             try:
+                import fitz
                 doc = fitz.open(pdf_path)
                 text = '\n'.join([page.get_text() for page in doc])
             except Exception as e:
