@@ -87,6 +87,9 @@ export const MobileMenu: React.FC<MobileMenuProps> = ({
                   <Link to="/profile" onClick={onClose} className={linkCls} activeProps={{ className: activeCls }}>
                     Profile
                   </Link>
+                  <Link to="/applications" onClick={onClose} className={linkCls} activeProps={{ className: activeCls }}>
+                    Applications
+                  </Link>
                 </>
               )}
               <Link to="/feedback" onClick={onClose} className={linkCls} activeProps={{ className: activeCls }}>

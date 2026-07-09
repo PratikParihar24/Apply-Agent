@@ -53,11 +53,12 @@ export const startHunt = async (role: string, location: string, maxResults: numb
     return { success: true, job_id, hunt_id };
 };
 
-export const generateForCompany = async (companyId: string): Promise<any> => {
+export const generateForCompany = async (companyId: string, custom_instructions?: string): Promise<any> => {
     if (USE_MOCK) return mockClient.generateForCompany(companyId);
 
     return apiCall(`/api/generate/${companyId}`, {
-        method: "POST"
+        method: "POST",
+        body: custom_instructions ? JSON.stringify({ custom_instructions }) : undefined
     });
 };
 
@@ -92,5 +93,48 @@ export const updateSettings = async (payload: any): Promise<any> => {
 export const deleteSettingsField = async (fieldName: string): Promise<any> => {
     return apiCall(`/api/settings/field/${fieldName}`, {
         method: "DELETE"
+    });
+};
+
+export const getApplications = async (): Promise<any> => {
+    if (USE_MOCK) return mockClient.getApplications();
+    return apiCall("/api/applications", {
+        method: "GET"
+    });
+};
+
+export const updateApplicationStatus = async (companyId: string, status: string): Promise<any> => {
+    if (USE_MOCK) return { success: true, status };
+    return apiCall(`/api/applications/${companyId}/status`, {
+        method: "PUT",
+        body: JSON.stringify({ status })
+    });
+};
+
+export const deleteApplication = async (applicationId: string): Promise<any> => {
+    if (USE_MOCK) return { success: true };
+    return apiCall(`/api/applications/${applicationId}`, {
+        method: "DELETE"
+    });
+};
+
+export const checkReplies = async (): Promise<any> => {
+    if (USE_MOCK) return { success: true, message: "IMAP replies checked" };
+    return apiCall("/api/applications/check-replies", {
+        method: "POST"
+    });
+};
+
+export const getActiveResume = async (): Promise<any> => {
+    if (USE_MOCK) return mockClient.getActiveResume();
+    return apiCall("/api/resume/active", {
+        method: "GET"
+    });
+};
+
+export const getAnalytics = async (): Promise<any> => {
+    if (USE_MOCK) return mockClient.getAnalytics();
+    return apiCall("/api/analytics", {
+        method: "GET"
     });
 };

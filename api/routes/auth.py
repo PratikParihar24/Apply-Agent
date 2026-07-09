@@ -1,8 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from pydantic import BaseModel
 from bson import ObjectId
 from core.database import get_db
 from core.auth import hash_password, verify_password, create_jwt, get_current_user
+from utils.imap_monitor import check_replies_for_user
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -48,7 +49,7 @@ async def register(request: RegisterRequest):
     }
 
 @router.post("/login")
-async def login(request: LoginRequest):
+async def login(request: LoginRequest, background_tasks: BackgroundTasks):
     db = get_db()
     email_clean = request.email.strip().lower()
     
@@ -61,6 +62,7 @@ async def login(request: LoginRequest):
         
     user_id = str(user["_id"])
     token = create_jwt(user_id)
+    background_tasks.add_task(check_replies_for_user, user_id)
     return {
         "token": token,
         "user": {

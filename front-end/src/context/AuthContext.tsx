@@ -142,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
     } catch (e) {
       console.warn("Backend update preferences endpoint not found or failed, saved locally:", e);
+      throw e;
     }
   };
 

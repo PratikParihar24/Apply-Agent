@@ -56,3 +56,55 @@ export const getStatus = async (): Promise<any> => {
         summary_preview: 'CS undergrad with Python, FastAPI, Node.js experience...'
     }));
 };
+
+export const getApplications = async (): Promise<any> => {
+    return new Promise(resolve => resolve([
+        {
+            _id: "mock_app_1",
+            company_name: "Mock Corp",
+            job_title: "React Developer",
+            applied_at: new Date().toISOString(),
+            status: "viewed",
+            llm_provider: "gemini"
+        },
+        {
+            _id: "mock_app_2",
+            company_name: "Local LLC",
+            job_title: "Python Engineer",
+            applied_at: new Date(Date.now() - 86400000).toISOString(),
+            status: "applied",
+            llm_provider: "ollama"
+        }
+    ]));
+};
+
+export const getActiveResume = async (): Promise<any> => {
+    return new Promise(resolve => resolve({
+        id: "mock_resume_123",
+        filename: "Resume_John_Doe.pdf",
+        summary: "An experienced full-stack developer with 5+ years specializing in Node.js, React, and Python. Proven track record of optimizing application performance and scaling distributed systems.",
+        sections_found: ["Experience", "Skills", "Education", "Projects"],
+        chunks_count: 12,
+        uploaded_at: new Date().toISOString()
+    }));
+};
+
+export const getAnalytics = async (): Promise<any> => {
+    return new Promise(resolve => resolve({
+        total_applications: 12,
+        by_status: {
+            applied: 5,
+            viewed: 3,
+            replied: 2,
+            interview: 1,
+            rejected: 1,
+            failed: 0
+        },
+        reply_rate: 0.333,
+        interview_rate: 0.083,
+        most_recent_application: new Date().toISOString(),
+        applications_this_month: 8,
+        top_roles: ["React Developer", "Python Engineer", "Backend Developer"],
+        llm_usage: { gemini: 8, groq: 3, ollama: 1 }
+    }));
+};

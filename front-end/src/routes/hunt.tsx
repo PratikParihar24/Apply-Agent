@@ -10,6 +10,8 @@ import {
 } from "../api/client";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
+import RichTextEditor from "../components/RichTextEditor";
+import { X } from "lucide-react";
 
 export const Route = createFileRoute("/hunt")({
   head: () => ({
@@ -171,11 +173,19 @@ function HuntPage() {
     setPopupCardId(id);
   };
 
-  const handleGenerate = async (id: number | string) => {
+  const [preGenModal, setPreGenModal] = useState<{ id: string | number, open: boolean, instructions: string }>({ id: "", open: false, instructions: "" });
+
+  const handleOpenPreGenModal = (id: number | string) => {
+    setPreGenModal({ id, open: true, instructions: "" });
+  };
+
+  const handleGenerate = async () => {
+    const { id, instructions } = preGenModal;
+    setPreGenModal({ id: "", open: false, instructions: "" });
     setPopupCardId(null);
     updateCard(id, { status: "generating" });
     try {
-      const result = await generateForCompany(String(id));
+      const result = await generateForCompany(String(id), instructions || undefined);
       updateCard(id, {
         status: "ready",
         coverLetter: result.cover_letter || "",
@@ -334,7 +344,7 @@ function HuntPage() {
 
         <Column title="Generating" count={generating.length} accent="sand">
           {generating.map((c, index) => (
-            <GeneratingCard key={c.id} card={c} index={index} />
+            <GeneratingCard key={c.id} card={c} onSkip={handleSkip} index={index} />
           ))}
           {generating.length === 0 && <EmptyHint text="Drafts will appear here." />}
         </Column>
@@ -358,9 +368,42 @@ function HuntPage() {
       <CompanyDetailPopup 
         card={popupCard as Card} 
         onClose={() => setPopupCardId(null)} 
-        onGenerate={() => handleGenerate(popupCard.id)} 
+        onGenerate={() => handleOpenPreGenModal(popupCard.id)} 
         onSkip={() => { setPopupCardId(null); handleSkip(popupCard.id); }} 
       />
+    )}
+
+    {preGenModal.open && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-darkbg/80 p-4 backdrop-blur-sm">
+        <div className="relative w-full max-w-lg rounded-card border border-sage bg-cardbg p-6 shadow-[var(--shadow-glow-strong)]" style={{ animation: "var(--animate-scale-in)" }}>
+          <h2 className="mb-2 text-xl font-medium text-cream">Custom AI Instructions</h2>
+          <p className="mb-4 text-sm text-mutedtext">
+            (Optional) Tell the AI what specific experiences, skills, or tone you want it to highlight in this cover letter and email.
+          </p>
+          <textarea
+            autoFocus
+            rows={4}
+            placeholder="e.g. Highlight my 5 years of Python experience, and mention my passion for their new AI product."
+            value={preGenModal.instructions}
+            onChange={(e) => setPreGenModal({ ...preGenModal, instructions: e.target.value })}
+            className="mb-4 w-full rounded-card border border-cardborder bg-darkbg p-3 text-sm text-cream focus:border-sage focus:outline-none focus:ring-1 focus:ring-sage"
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              onClick={() => setPreGenModal({ id: "", open: false, instructions: "" })}
+              className="rounded-card px-4 py-2 text-sm font-semibold text-mutedtext transition-colors hover:text-cream btn-ripple"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleGenerate}
+              className="rounded-card bg-sage px-6 py-2 text-sm font-bold text-darkbg transition-transform hover:scale-[1.02] active:scale-[0.98] shadow-md btn-ripple"
+            >
+              Start Generation
+            </button>
+          </div>
+        </div>
+      </div>
     )}
     {showResetModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-darkbg/80 p-4 backdrop-blur-sm">
@@ -696,9 +739,16 @@ function JobCard({
   return (
     <article
       style={{ animation: "var(--animate-slide-in)", animationDelay: `${index * 100}ms` }}
-      className="group rounded-card border border-cardborder bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
+      className="group relative rounded-card border border-cardborder bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
     >
-      <div className="mb-2 flex items-start justify-between gap-2">
+      <button
+        onClick={() => onSkip(card.id)}
+        className="absolute top-4 right-4 text-mutedtext hover:text-cream opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Skip role"
+      >
+        <X size={14} />
+      </button>
+      <div className="mb-2 flex items-start justify-between gap-2 pr-5">
         <div className="min-w-0">
           <h3 className="truncate font-bold text-cream">{card.name}</h3>
           <p className="truncate text-xs text-mutedtext">{card.role}</p>
@@ -724,7 +774,7 @@ function JobCard({
   );
 }
 
-function GeneratingCard({ card, index }: { card: Card; index: number }) {
+function GeneratingCard({ card, onSkip, index }: { card: Card; onSkip: (id: number | string) => void; index: number }) {
   const [progress, setProgress] = useState(0);
   useEffect(() => {
     const start = Date.now();
@@ -739,9 +789,16 @@ function GeneratingCard({ card, index }: { card: Card; index: number }) {
   return (
     <article
       style={{ animation: "var(--animate-slide-in)", animationDelay: `${index * 100}ms` }}
-      className="rounded-card border border-cardborder bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
+      className="group relative rounded-card border border-cardborder bg-cardbg p-4 hover-card-trigger hover:bg-cardbg-hover"
     >
-      <div className="mb-3 flex items-start justify-between gap-2">
+      <button
+        onClick={() => onSkip(card.id)}
+        className="absolute top-4 right-4 text-mutedtext hover:text-cream opacity-0 group-hover:opacity-100 transition-opacity"
+        title="Abort generation"
+      >
+        <X size={14} />
+      </button>
+      <div className="mb-3 flex items-start justify-between gap-2 pr-5">
         <div className="min-w-0">
           <h3 className="truncate font-bold text-cream">{card.name}</h3>
           <p className="truncate text-xs text-mutedtext">{card.role}</p>
@@ -830,20 +887,38 @@ function ReadyCard({
               }} 
             />
           )}
-          <Field
-            label="Cover Letter"
-            value={card.coverLetter}
-            editing={editing}
-            onChange={(v) => onUpdate(card.id, { coverLetter: v })}
-            rows={5}
-          />
-          <Field
-            label="Email Body"
-            value={card.emailBody}
-            editing={editing}
-            onChange={(v) => onUpdate(card.id, { emailBody: v })}
-            rows={3}
-          />
+          
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-mutedtext px-1">Cover Letter</label>
+            {editing ? (
+              <RichTextEditor
+                value={card.coverLetter}
+                onChange={(v) => onUpdate(card.id, { coverLetter: v })}
+                minHeight="200px"
+              />
+            ) : (
+              <div 
+                className="rounded-card border border-cardborder bg-darkbg p-3 text-sm text-cream/90 prose prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: card.coverLetter }}
+              />
+            )}
+          </div>
+          
+          <div className="space-y-1">
+            <label className="text-xs font-bold uppercase tracking-wider text-mutedtext px-1">Email Body</label>
+            {editing ? (
+              <RichTextEditor
+                value={card.emailBody}
+                onChange={(v) => onUpdate(card.id, { emailBody: v })}
+                minHeight="100px"
+              />
+            ) : (
+              <div 
+                className="rounded-card border border-cardborder bg-darkbg p-3 text-sm text-cream/90 prose prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-sm max-w-none"
+                dangerouslySetInnerHTML={{ __html: card.emailBody }}
+              />
+            )}
+          </div>
 
           <div className="rounded-card border border-cardborder">
             <button

@@ -18,6 +18,7 @@ Agent-apply/
 │   ├── main.py
 │   └── routes/
 │       ├── __init__.py
+│       ├── analytics.py          <-- Added in Group 6
 │       ├── auth.py
 │       ├── community.py
 │       ├── hunt.py
@@ -37,7 +38,7 @@ Agent-apply/
 │   ├── __init__.py
 │   ├── resume_processor.py
 │   ├── search_agent.py
-│   ├── sending_agent.py
+│   ├── sending_agent.py          <-- Modified (Cover Letter sent as email body, Resume attached)
 │   ├── shortlister_agent.py
 │   ├── tailor_agent.py
 │   └── writer_agent.py
@@ -51,19 +52,23 @@ Agent-apply/
 │   ├── vite.config.ts
 │   └── src/
 │       ├── api/
+│       │   ├── client.ts
+│       │   └── mockClient.ts
 │       ├── components/
 │       │   ├── ui/
 │       │   ├── MobileMenu.tsx
 │       │   ├── ProtectedRoute.tsx
+│       │   ├── StatCard.tsx      <-- Added in Group 6
 │       │   └── ThemeToggle.tsx
 │       ├── context/
 │       ├── hooks/
 │       ├── routes/
 │       │   ├── __root.tsx
+│       │   ├── applications.tsx  <-- Added in Group 5 (with Optimistic UI deletion)
 │       │   ├── community.tsx
 │       │   ├── feedback.tsx
 │       │   ├── hunt.tsx
-│       │   ├── index.tsx
+│       │   ├── index.tsx         <-- Dynamic Dashboard Landing Page
 │       │   ├── login.tsx
 │       │   ├── profile.tsx
 │       │   ├── register.tsx
@@ -73,7 +78,8 @@ Agent-apply/
 │       └── routeTree.gen.ts
 └── utils/
     ├── __init__.py
-    └── encryption.py
+    ├── encryption.py
+    └── imap_monitor.py           <-- Added in Group 5
 ```
 
 ## 📄 File Details and Context
@@ -105,7 +111,7 @@ Agent-apply/
 ### 4. `core/database.py`
 **Purpose**: Manages MongoDB connection lifecycle and indexes.
 **Functions**:
-- `init_db()`: Initializes asynchronous MongoDB connection using Motor and builds database indexes for `users`, `resumes`, `hunt_sessions`, `companies`, `community_posts`, and `applications`. Specifically includes an index on `users.gmail_address` for efficient IMAP polling lookups.
+- `init_db()`: Initializes asynchronous MongoDB connection using Motor and builds database indexes for `users`, `resumes`, `hunt_sessions`, `companies`, `community_posts`, and `applications`. Specifically includes an index on `users.gmail_address` for efficient IMAP polling lookups, a search index on `applications.status`, and a compound sorting/counting index on `[("user_id", 1), ("applied_at", -1)]`.
 
 ### 5. `core/embedder.py`
 **Purpose**: Handles vector embeddings for text chunks using `sentence-transformers`.
@@ -114,9 +120,10 @@ Agent-apply/
 **Purpose**: Entrypoint of the FastAPI backend application. Checks for required environment variables on startup and hooks up the modular routers.
 
 ### 7. `api/routes/`
-- **`auth.py`**: Authentication routes (`POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/auth/update`).
+- **`auth.py`**: Authentication routes (`POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `PUT /api/auth/update`). Triggers background IMAP reply checking on login.
 - **`resume.py`**: Resume management routes.
-- **`hunt.py`**: SSE hunting streams, tailored application materials generation (`POST /api/generate/{company_id}`), and mail delivery dispatch (`POST /api/send/{company_id}`). Also handles the Resend Webhook callback (`POST /api/webhooks/resend`) for open/click tracking.
+- **`hunt.py`**: SSE hunting streams, tailored application materials generation (`POST /api/generate/{company_id}`), and mail delivery dispatch (`POST /api/send/{company_id}`). Also handles the Resend Webhook callback (`POST /api/webhooks/resend`) for open/click tracking. Includes applications GET, PUT status, and DELETE routes.
+- **`analytics.py`**: Queries application statistics concurrently using MongoDB aggregation pipelines (`GET /api/analytics`).
 - **`community.py`**: Post feeds and social interaction.
 - **`settings.py`**: User configuration routes to get and update encrypted API keys and LLM preferences (`GET /api/settings`, `PUT /api/settings`, `DELETE /api/settings/field/{field_name}`).
 
@@ -133,28 +140,33 @@ Agent-apply/
 **Purpose**: Retrieves relevant resume chunks using `resume_processor` and dynamically organizes them. Accepts `user_settings` on initialization to pass to the LLM router.
 
 ### 12. `agents/writer_agent.py`
-**Purpose**: Uses the LLM Router to author the final job application materials (Cover Letter, Email Body, Email Subject). Accepts `user_settings` and injects `llm_provider` into the returned response payload so the UI knows which AI was used.
+**Purpose**: Uses the LLM Router to author the final job application materials (Cover Letter, Email Body, Email Subject). Injects user's name override and records the `llm_provider` name.
 
 ### 13. `agents/sending_agent.py`
-**Purpose**: Assembles PDFs on-the-fly for cover letters and tailored resumes using `fpdf`, then dispatches them via the **Resend API**. Expects a `user_resend_key` for overriding the system default.
+**Purpose**: Dispatches applications via **Resend API**. Sends the cover letter text directly as the primary email body and attaches the user's active resume.
 
-### 14. Utilities
-- **`utils/encryption.py`**: Uses `cryptography.fernet` to symmetrically encrypt and decrypt sensitive API keys before they are saved to MongoDB.
+### 14. `utils/`
+- **`encryption.py`**: Uses `cryptography.fernet` to symmetrically encrypt/decrypt sensitive settings.
+- **`imap_monitor.py`**: Scans user's Gmail box for replies using IMAP. Matches mail headers (`In-Reply-To`/`References`) with application `message_id`s, and transitions matches to `"replied"` status.
+
+---
 
 ## 🔄 Current Application Flow (Resume Parsing & Streaming Hunt)
 
-1. **Authentication**: Users sign up or log in. Valid credentials generate a JWT token stored on the client.
-2. **Settings**: Users can optionally configure their own API keys (Gemini, Resend) and preferred LLM in the settings page. These are stored encrypted in the database.
+1. **Authentication**: Users sign up or log in. Valid credentials generate a JWT token stored on the client. Logging in schedules a background task to poll IMAP for new replies.
+2. **Settings**: Users can optionally configure their own API keys (Gemini, Resend, Gmail IMAP) and preferred LLM in settings. These are stored encrypted in the database.
 3. **Resume Upload**: User uploads a PDF; `ResumeProcessor` parses, embeds, and stores chunks in ChromaDB.
 4. **Hunt Initiation**: The user posts target parameters, launching a background worker thread.
 5. **Scraping and Stream Feed**: `SearchAgent` finds companies, `ShortlisterAgent` scores them, and SSE streams the results to the front-end dashboard instantly.
 6. **Tailoring and Generation**:
    - The user clicks on a company profile to trigger `POST /api/generate/{company_id}`.
-   - The backend fetches `user_settings` (decrypting keys) and passes them to `TailorAgent` and `WriterAgent`.
-   - The resilient LLM chain generates a Cover Letter and Email, returning the generated content along with the `llm_provider` name.
-   - The UI displays an `LLMBanner` indicating which AI model was used.
-7. **Dispatch and Tracking**:
+   - The resilient LLM chain generates a Cover Letter and Email Body, returning the generated content along with the `llm_provider` name.
+7. **Dispatch and Webhook Tracking**:
    - The user clicks "Send Application" (`POST /api/send/{company_id}`).
-   - `SendingAgent` converts content to PDF attachments and dispatches via the **Resend SDK**.
-   - Resend returns a `message_id`, which is saved to the `applications` collection.
-   - When the employer opens the email, Resend triggers a webhook to `POST /api/webhooks/resend` (verified securely using `svix`), updating the application status to `viewed`.
+   - `SendingAgent` dispatches the application via **Resend SDK** (Cover letter in email body, Resume attached).
+   - Resend returns a `message_id`, saved to the `applications` collection with status `"applied"`.
+   - Webhook callback `POST /api/webhooks/resend` handles recipient open/click events, transitioning status to `"viewed"`.
+8. **IMAP Reply Polling**:
+   - Background polling or manual checks retrieve inbox messages to detect replies matching sent `message_id`s, transitioning matches to `"replied"` status.
+9. **Analytics Dashboard**:
+   - Logged-in users see the **Analytics Dashboard** directly on `/`. It queries backend aggregates concurrently to show total counts, active pipeline, reply/interview rates, top roles, and LLM provider distribution.

@@ -163,7 +163,7 @@ function LLMDropdown() {
 
   const KeyIcon = ({ isUser }: { isUser: boolean }) => (
     <div title={isUser ? "Using your personal API Key" : "Using server default API Key"} className="ml-auto">
-      {isUser ? <UserIcon size={12} className="text-sage" /> : <Server size={12} className="text-white/40" />}
+      {isUser ? <UserIcon size={12} className="text-sage" /> : <Server size={12} className="text-mutedtext/60" />}
     </div>
   );
 
@@ -173,9 +173,9 @@ function LLMDropdown() {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 rounded-full border border-cardborder bg-cardbg px-3 py-1.5 shadow-sm transition-all hover:border-terracotta/50 focus-visible:outline-none"
       >
-        <span className={`h-2 w-2 rounded-full ${dotColor} shadow-[0_0_8px_rgba(0,0,0,0.5)]`} />
+        <span className={`h-2 w-2 rounded-full ${dotColor} shadow-[0_0_8px_rgba(0,0,0,0.3)]`} />
         <span className="text-xs font-bold tracking-wide text-cream">{label}</span>
-        <ChevronDown size={14} className="text-white/50" />
+        <ChevronDown size={14} className="text-mutedtext" />
       </button>
 
       {isOpen && (
@@ -183,29 +183,29 @@ function LLMDropdown() {
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 top-full mt-2 w-56 rounded-xl border border-cardborder bg-cardbg shadow-xl z-50 overflow-hidden text-sm">
             <div className="p-2">
-              <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-white/40">Local Models</div>
+              <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-mutedtext">Local Models</div>
               {status.providers.ollama.available ? (
                 status.providers.ollama.models.map((model: string) => (
                   <button 
                     key={model}
                     onClick={() => changeProvider("ollama")}
-                    className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 text-white/80 transition-colors"
+                    className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-cardbg-hover text-cream transition-colors"
                   >
                     {status.active_provider === "ollama" && status.active_model === model ? <Check size={14} className="text-terracotta" /> : <div className="w-[14px]" />}
                     {model}
                   </button>
                 ))
               ) : (
-                <div className="px-2 py-1.5 text-xs text-white/30 italic">Ollama offline (port 11434)</div>
+                <div className="px-2 py-1.5 text-xs text-mutedtext/50 italic">Ollama offline (port 11434)</div>
               )}
 
-              <div className="mt-2 mb-1 border-t border-white/5" />
-              <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-white/40">Cloud Providers</div>
+              <div className="mt-2 mb-1 border-t border-cardborder/40" />
+              <div className="px-2 py-1 text-xs font-bold uppercase tracking-wider text-mutedtext">Cloud Providers</div>
               
               <button 
                 onClick={() => changeProvider("gemini")}
                 disabled={!status.providers.gemini.available}
-                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 text-white/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-cardbg-hover text-cream transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {status.active_provider === "gemini" ? <Check size={14} className="text-terracotta" /> : <div className="w-[14px]" />}
                 Gemini
@@ -215,7 +215,7 @@ function LLMDropdown() {
               <button 
                 onClick={() => changeProvider("groq")}
                 disabled={!status.providers.groq.available}
-                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 text-white/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-cardbg-hover text-cream transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {status.active_provider === "groq" ? <Check size={14} className="text-terracotta" /> : <div className="w-[14px]" />}
                 Groq
@@ -225,7 +225,7 @@ function LLMDropdown() {
               <button 
                 onClick={() => changeProvider("openrouter")}
                 disabled={!status.providers.openrouter.available}
-                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/5 text-white/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-cardbg-hover text-cream transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {status.active_provider === "openrouter" ? <Check size={14} className="text-terracotta" /> : <div className="w-[14px]" />}
                 OpenRouter
@@ -319,6 +319,7 @@ function Navbar() {
                 </Link>
                 <Link to="/community" className={linkCls} activeProps={{ className: activeCls }}>Community</Link>
                 <Link to="/profile" className={linkCls} activeProps={{ className: activeCls }}>Profile</Link>
+                <Link to="/applications" className={linkCls} activeProps={{ className: activeCls }}>Applications</Link>
                 <Link
                   to="/settings"
                   className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors hover:bg-white/5"

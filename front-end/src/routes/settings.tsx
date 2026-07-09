@@ -111,24 +111,24 @@ function SettingsPage() {
     }
   };
 
-  if (isLoading) return <div className="p-8 text-center text-white/50">Loading settings...</div>;
+  if (isLoading) return <div className="p-8 text-center text-mutedtext">Loading settings...</div>;
 
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-8 pb-20">
       <div>
-        <h1 className="text-3xl font-light text-white mb-2">Settings</h1>
-        <p className="text-white/60">Configure your personal API keys and AI preferences.</p>
+        <h1 className="text-3xl font-light text-cream mb-2">Settings</h1>
+        <p className="text-mutedtext">Configure your personal API keys and AI preferences.</p>
       </div>
 
       {/* LLM Configuration Section */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-6">
+      <div className="bg-cardbg border border-cardborder rounded-xl p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-medium text-white flex items-center gap-2">
+          <h2 className="text-xl font-medium text-cream flex items-center gap-2">
             LLM Configuration
           </h2>
           <button 
             onClick={() => setShowLlmInfo(true)}
-            className="text-white/40 hover:text-white transition-colors p-1"
+            className="text-mutedtext/60 hover:text-cream transition-colors p-1"
           >
             <Info size={20} />
           </button>
@@ -136,11 +136,11 @@ function SettingsPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-white/70 mb-1">Preferred AI Provider</label>
+            <label className="block text-sm text-mutedtext mb-1">Preferred AI Provider</label>
             <select
               value={preferredLlm}
               onChange={(e) => setPreferredLlm(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-white/30"
+              className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 text-cream focus:outline-none focus:border-terracotta"
             >
               <option value="auto">Auto (Default fallback chain)</option>
               <option value="ollama">Ollama (Local)</option>
@@ -152,31 +152,31 @@ function SettingsPage() {
 
           {(preferredLlm === "ollama" || preferredLlm === "auto") && (
             <div>
-              <label className="block text-sm text-white/70 mb-1">Ollama URL (Optional)</label>
+              <label className="block text-sm text-mutedtext mb-1">Ollama URL (Optional)</label>
               <input
                 type="text"
                 placeholder="http://localhost:11434"
                 value={ollamaUrl}
                 onChange={(e) => setOllamaUrl(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
               />
             </div>
           )}
 
           {(preferredLlm === "gemini" || preferredLlm === "auto") && (
             <div>
-              <label className="block text-sm text-white/70 mb-1">Gemini API Key</label>
+              <label className="block text-sm text-mutedtext mb-1">Gemini API Key</label>
               <div className="relative">
                 <input
                   type={showGemini ? "text" : "password"}
                   placeholder="AIzaSy..."
                   value={geminiKey}
                   onChange={(e) => setGeminiKey(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 pr-10 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                  className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 pr-10 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
                 />
                 <button
                   onClick={() => setShowGemini(!showGemini)}
-                  className="absolute right-3 top-2.5 text-white/40 hover:text-white/80"
+                  className="absolute right-3 top-2.5 text-mutedtext/60 hover:text-cream"
                 >
                   {showGemini ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -186,18 +186,18 @@ function SettingsPage() {
 
           {(preferredLlm === "groq" || preferredLlm === "auto") && (
             <div>
-              <label className="block text-sm text-white/70 mb-1">Groq API Key</label>
+              <label className="block text-sm text-mutedtext mb-1">Groq API Key</label>
               <div className="relative">
                 <input
                   type={showGroq ? "text" : "password"}
                   placeholder="gsk_..."
                   value={groqKey}
                   onChange={(e) => setGroqKey(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 pr-10 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                  className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 pr-10 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
                 />
                 <button
                   onClick={() => setShowGroq(!showGroq)}
-                  className="absolute right-3 top-2.5 text-white/40 hover:text-white/80"
+                  className="absolute right-3 top-2.5 text-mutedtext/60 hover:text-cream"
                 >
                   {showGroq ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -207,18 +207,18 @@ function SettingsPage() {
 
           {(preferredLlm === "openrouter" || preferredLlm === "auto") && (
             <div>
-              <label className="block text-sm text-white/70 mb-1">OpenRouter API Key</label>
+              <label className="block text-sm text-mutedtext mb-1">OpenRouter API Key</label>
               <div className="relative">
                 <input
                   type={showOpenRouter ? "text" : "password"}
                   placeholder="sk-or-v1-..."
                   value={openRouterKey}
                   onChange={(e) => setOpenRouterKey(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 pr-10 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                  className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 pr-10 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
                 />
                 <button
                   onClick={() => setShowOpenRouter(!showOpenRouter)}
-                  className="absolute right-3 top-2.5 text-white/40 hover:text-white/80"
+                  className="absolute right-3 top-2.5 text-mutedtext/60 hover:text-cream"
                 >
                   {showOpenRouter ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -229,7 +229,7 @@ function SettingsPage() {
           <button
             onClick={handleSaveLlm}
             disabled={saveMutation.isPending}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+            className="flex items-center gap-2 bg-terracotta/20 hover:bg-terracotta/35 border border-terracotta/40 text-cream px-4 py-2 rounded-lg transition-colors text-sm font-medium"
           >
             <Save size={16} /> Save LLM Settings
           </button>
@@ -237,14 +237,14 @@ function SettingsPage() {
       </div>
 
       {/* Email Configuration Section */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-6 space-y-6">
+      <div className="bg-cardbg border border-cardborder rounded-xl p-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-medium text-white flex items-center gap-2">
+          <h2 className="text-xl font-medium text-cream flex items-center gap-2">
             📧 Email Configuration
           </h2>
           <button 
             onClick={() => setShowEmailInfo(true)}
-            className="text-white/40 hover:text-white transition-colors p-1"
+            className="text-mutedtext/60 hover:text-cream transition-colors p-1"
           >
             <Info size={20} />
           </button>
@@ -252,18 +252,18 @@ function SettingsPage() {
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm text-white/70 mb-1">Resend API Key</label>
+            <label className="block text-sm text-mutedtext mb-1">Resend API Key</label>
             <div className="relative">
               <input
                 type={showResend ? "text" : "password"}
                 placeholder="re_..."
                 value={resendKey}
                 onChange={(e) => setResendKey(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 pr-10 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 pr-10 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
               />
               <button
                 onClick={() => setShowResend(!showResend)}
-                className="absolute right-3 top-2.5 text-white/40 hover:text-white/80"
+                className="absolute right-3 top-2.5 text-mutedtext/60 hover:text-cream"
               >
                 {showResend ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -271,29 +271,29 @@ function SettingsPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-white/70 mb-1">Gmail Address (For IMAP Reply Tracking)</label>
+            <label className="block text-sm text-mutedtext mb-1">Gmail Address (For IMAP Reply Tracking)</label>
             <input
               type="email"
               placeholder="you@gmail.com"
               value={gmailAddress}
               onChange={(e) => setGmailAddress(e.target.value)}
-              className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+              className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-white/70 mb-1">Gmail App Password</label>
+            <label className="block text-sm text-mutedtext mb-1">Gmail App Password</label>
             <div className="relative">
               <input
                 type={showGmail ? "text" : "password"}
                 placeholder="xxxx xxxx xxxx xxxx"
                 value={gmailPassword}
                 onChange={(e) => setGmailPassword(e.target.value)}
-                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-2 pr-10 text-white placeholder-white/30 focus:outline-none focus:border-white/30"
+                className="w-full bg-darkbg border border-cardborder rounded-lg px-4 py-2 pr-10 text-cream placeholder-mutedtext/40 focus:outline-none focus:border-terracotta"
               />
               <button
                 onClick={() => setShowGmail(!showGmail)}
-                className="absolute right-3 top-2.5 text-white/40 hover:text-white/80"
+                className="absolute right-3 top-2.5 text-mutedtext/60 hover:text-cream"
               >
                 {showGmail ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -303,7 +303,7 @@ function SettingsPage() {
           <button
             onClick={handleSaveEmail}
             disabled={saveMutation.isPending}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+            className="flex items-center gap-2 bg-terracotta/20 hover:bg-terracotta/35 border border-terracotta/40 text-cream px-4 py-2 rounded-lg transition-colors text-sm font-medium"
           >
             <Save size={16} /> Save Email Settings
           </button>
@@ -312,70 +312,70 @@ function SettingsPage() {
 
       {/* Danger Zone */}
       <div className="border border-red-500/20 bg-red-500/5 rounded-xl p-6">
-        <h2 className="text-xl font-medium text-red-400 flex items-center gap-2 mb-4">
+        <h2 className="text-xl font-medium text-red-500 flex items-center gap-2 mb-4">
           <ShieldAlert size={20} /> Danger Zone
         </h2>
-        <p className="text-sm text-white/60 mb-4">
+        <p className="text-sm text-mutedtext mb-4">
           This will wipe all your personal API keys and settings from the database.
         </p>
         <button
           onClick={handleClearAll}
-          className="flex items-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg transition-colors text-sm"
+          className="flex items-center gap-2 bg-red-500/20 hover:bg-red-500/30 text-red-500 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
         >
           <Trash2 size={16} /> Clear all settings
         </button>
       </div>
 
       {showLlmInfo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
-              <button onClick={() => setShowLlmInfo(false)} className="absolute top-4 right-4 text-white/40 hover:text-white"><X size={20}/></button>
-              <h3 className="text-xl font-semibold text-white mb-4">How to Setup AI Providers</h3>
-              <div className="space-y-4 text-sm text-white/70">
-                <div>
-                  <strong className="text-white">Ollama (Local)</strong>
-                  <p>1. Download Ollama from ollama.com and run it.</p>
-                  <p>2. Open a terminal and run <code className="bg-white/10 px-1 rounded">ollama run llama3.2:1b</code></p>
-                  <p>3. The default port is already configured (localhost:11434).</p>
-                </div>
-                <div>
-                  <strong className="text-white">Gemini</strong>
-                  <p>Get a free API key from Google AI Studio.</p>
-                </div>
-                <div>
-                  <strong className="text-white">Groq</strong>
-                  <p>Get an incredibly fast inference key from console.groq.com.</p>
-                </div>
-                <div>
-                  <strong className="text-white">OpenRouter</strong>
-                  <p>Get access to hundreds of models from openrouter.ai/keys.</p>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-darkbg/80 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-lg bg-cardbg border border-cardborder rounded-2xl p-6 shadow-2xl">
+            <button onClick={() => setShowLlmInfo(false)} className="absolute top-4 right-4 text-mutedtext hover:text-cream"><X size={20}/></button>
+            <h3 className="text-xl font-semibold text-cream mb-4">How to Setup AI Providers</h3>
+            <div className="space-y-4 text-sm text-mutedtext">
+              <div>
+                <strong className="text-cream">Ollama (Local)</strong>
+                <p>1. Download Ollama from ollama.com and run it.</p>
+                <p>2. Open a terminal and run <code className="bg-darkbg px-1 rounded border border-cardborder">ollama run llama3.2:1b</code></p>
+                <p>3. The default port is already configured (localhost:11434).</p>
+              </div>
+              <div>
+                <strong className="text-cream">Gemini</strong>
+                <p>Get a free API key from Google AI Studio.</p>
+              </div>
+              <div>
+                <strong className="text-cream">Groq</strong>
+                <p>Get an incredibly fast inference key from console.groq.com.</p>
+              </div>
+              <div>
+                <strong className="text-cream">OpenRouter</strong>
+                <p>Get access to hundreds of models from openrouter.ai/keys.</p>
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {showEmailInfo && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="relative w-full max-w-lg bg-[#111] border border-white/10 rounded-2xl p-6 shadow-2xl">
-              <button onClick={() => setShowEmailInfo(false)} className="absolute top-4 right-4 text-white/40 hover:text-white"><X size={20}/></button>
-              <h3 className="text-xl font-semibold text-white mb-4">How to Setup Email Delivery</h3>
-              <div className="space-y-4 text-sm text-white/70">
-                <div>
-                  <strong className="text-white">Resend API Key</strong>
-                  <p>Get a free key from resend.com. Excellent for sending to verified emails.</p>
-                </div>
-                <div>
-                  <strong className="text-white">Gmail App Password</strong>
-                  <p>1. Go to your Google Account Settings &gt; Security.</p>
-                  <p>2. Enable 2-Step Verification if you haven't.</p>
-                  <p>3. Search for "App Passwords" and create a new one for this app.</p>
-                  <p>4. Enter your full Gmail address and the 16-character password here.</p>
-                </div>
+      {showEmailInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-darkbg/80 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-lg bg-cardbg border border-cardborder rounded-2xl p-6 shadow-2xl">
+            <button onClick={() => setShowEmailInfo(false)} className="absolute top-4 right-4 text-mutedtext hover:text-cream"><X size={20}/></button>
+            <h3 className="text-xl font-semibold text-cream mb-4">How to Setup Email Delivery</h3>
+            <div className="space-y-4 text-sm text-mutedtext">
+              <div>
+                <strong className="text-cream">Resend API Key</strong>
+                <p>Get a free key from resend.com. Excellent for sending to verified emails.</p>
+              </div>
+              <div>
+                <strong className="text-cream">Gmail App Password</strong>
+                <p>1. Go to your Google Account Settings &gt; Security.</p>
+                <p>2. Enable 2-Step Verification if you haven't.</p>
+                <p>3. Search for "App Passwords" and create a new one for this app.</p>
+                <p>4. Enter your full Gmail address and the 16-character password here.</p>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
   );
-}
+};

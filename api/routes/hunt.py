@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from typing import Optional
 from bson import ObjectId
 from datetime import datetime
 import uuid
@@ -20,6 +21,7 @@ from agents.search_agent import SearchAgent
 from agents.tailor_agent import TailorAgent
 from agents.writer_agent import WriterAgent
 from agents.sending_agent import SendingAgent
+from utils.imap_monitor import check_replies_for_user
 
 router = APIRouter(tags=["hunt"])
 
@@ -143,8 +145,11 @@ async def stream_hunt(job_id: str, current_user_id: str = Depends(get_current_us
             
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
+class GenerateRequest(BaseModel):
+    custom_instructions: Optional[str] = None
+
 @router.post("/api/generate/{company_id}")
-async def generate_materials(company_id: str, current_user_id: str = Depends(get_current_user)):
+async def generate_materials(company_id: str, request: GenerateRequest = None, current_user_id: str = Depends(get_current_user)):
     db = get_db()
     company = await db.companies.find_one({"_id": company_id, "user_id": current_user_id})
     if not company:
@@ -155,13 +160,14 @@ async def generate_materials(company_id: str, current_user_id: str = Depends(get
         raise HTTPException(status_code=400, detail="No active resume found. Please upload one first.")
         
     resume_summary_text = resume.get("summary", "")
-    2
     user = await db.users.find_one({"_id": ObjectId(current_user_id)})
     user_settings = {
         "preferred_llm": user.get("preferred_llm", "auto"),
         "ollama_url": user.get("ollama_url", ""),
         "gemini_api_key": user.get("gemini_api_key", "") # This is safely encrypted in the DB!
     } if user else {}
+
+    candidate_name = user.get("name") if user else None
 
     # Scrape company description
     company_description = ""
@@ -182,7 +188,10 @@ async def generate_materials(company_id: str, current_user_id: str = Depends(get
     tailored_resume = tailor_agent.tailor(company, resume_processor, rewrite=True)
     
     writer_agent = WriterAgent(user_settings)
-    result = writer_agent.write(company, resume_summary_text, tailored_resume, company_description=company_description)
+    
+    custom_inst = request.custom_instructions if request else None
+    
+    result = writer_agent.write(company, resume_summary_text, tailored_resume, company_description=company_description, custom_instructions=custom_inst, candidate_name=candidate_name)
     
     cover_letter = result.get("cover_letter", "")
     email_body = result.get("email_body", "")
@@ -242,10 +251,26 @@ async def send_application(company_id: str, request: SendRequest, current_user_i
             "company_id": company_id,
             "company_name": company.get("company"),
             "job_title": company.get("job_title"),
-            "sent_at": datetime.utcnow(),
-            "status": "sent" if res.get("success") else "failed",
+            "applied_at": datetime.utcnow(),
+            "last_updated": datetime.utcnow(),
+            "status": "applied" if res.get("success") else "failed",
+            "status_history": [{
+                "status": "applied" if res.get("success") else "failed",
+                "timestamp": datetime.utcnow(),
+                "source": "manual"
+            }] if res.get("success") else [],
             "message": res.get("message"),
-            "message_id": res.get("message_id")
+            "message_id": res.get("message_id"),
+            "llm_provider": company.get("llm_provider", "unknown"),
+            "cover_letter": request.cover_letter,
+            "email_body": request.email_body,
+            "subject": request.subject,
+            "tailored_resume": request.tailored_resume,
+            "website": company.get("website"),
+            "hr_email": company.get("hr_email"),
+            "apply_url": company.get("apply_url"),
+            "fit_explanation": company.get("fit_explanation"),
+            "score": company.get("score")
         }
         await db.applications.insert_one(app_doc)
         
@@ -266,9 +291,25 @@ async def send_application(company_id: str, request: SendRequest, current_user_i
             "company_id": company_id,
             "company_name": company.get("company"),
             "job_title": company.get("job_title"),
-            "sent_at": datetime.utcnow(),
+            "applied_at": datetime.utcnow(),
+            "last_updated": datetime.utcnow(),
             "status": "failed",
-            "message": str(e)
+            "status_history": [{
+                "status": "failed",
+                "timestamp": datetime.utcnow(),
+                "source": "manual"
+            }],
+            "message": str(e),
+            "llm_provider": company.get("llm_provider", "unknown"),
+            "cover_letter": request.cover_letter,
+            "email_body": request.email_body,
+            "subject": request.subject,
+            "tailored_resume": request.tailored_resume,
+            "website": company.get("website"),
+            "hr_email": company.get("hr_email"),
+            "apply_url": company.get("apply_url"),
+            "fit_explanation": company.get("fit_explanation"),
+            "score": company.get("score")
         }
         await db.applications.insert_one(app_doc)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -301,10 +342,98 @@ async def resend_webhook(request: Request):
             # Update application status to viewed
             result = await db.applications.update_many(
                 {"message_id": message_id},
-                {"$set": {"status": "viewed"}}
+                {
+                    "$set": {"status": "viewed", "last_updated": datetime.utcnow()},
+                    "$push": {
+                        "status_history": {
+                            "status": "viewed",
+                            "timestamp": datetime.utcnow(),
+                            "source": "auto_resend"
+                        }
+                    }
+                }
             )
             if result.modified_count == 0:
                 print(f"Webhook received for message_id {message_id} but no matching application found.")
                 
     return {"success": True}
+
+class StatusUpdateRequest(BaseModel):
+    status: str
+
+@router.get("/api/applications")
+async def get_applications(current_user_id: str = Depends(get_current_user)):
+    db = get_db()
+    cursor = db.applications.find({"user_id": current_user_id}).sort("applied_at", -1)
+    apps = await cursor.to_list(length=100)
+    for app in apps:
+        app["_id"] = str(app["_id"])
+        if "applied_at" in app and isinstance(app["applied_at"], datetime):
+            app["applied_at"] = app["applied_at"].isoformat()
+        if "last_updated" in app and isinstance(app["last_updated"], datetime):
+            app["last_updated"] = app["last_updated"].isoformat()
+        if "sent_at" in app and isinstance(app["sent_at"], datetime):
+            app["applied_at"] = app["sent_at"].isoformat()
+        if "status_history" in app:
+            for h in app["status_history"]:
+                if "timestamp" in h and isinstance(h["timestamp"], datetime):
+                    h["timestamp"] = h["timestamp"].isoformat()
+    return apps
+
+@router.put("/api/applications/{company_id}/status")
+async def update_application_status(company_id: str, request: StatusUpdateRequest, current_user_id: str = Depends(get_current_user)):
+    valid_statuses = ["applied", "viewed", "replied", "interview", "rejected"]
+    if request.status not in valid_statuses:
+        raise HTTPException(status_code=422, detail=f"Invalid status. Must be one of {valid_statuses}")
+        
+    db = get_db()
+    query = {"user_id": current_user_id}
+    try:
+        query["_id"] = ObjectId(company_id)
+    except Exception:
+        query["company_id"] = company_id
+
+    app = await db.applications.find_one(query)
+    if not app:
+        query = {"user_id": current_user_id, "company_id": company_id}
+        app = await db.applications.find_one(query)
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+    await db.applications.update_one(
+        {"_id": app["_id"]},
+        {
+            "$set": {
+                "status": request.status,
+                "last_updated": datetime.utcnow()
+            },
+            "$push": {
+                "status_history": {
+                    "status": request.status,
+                    "timestamp": datetime.utcnow(),
+                    "source": "manual"
+                }
+            }
+        }
+    )
+    return {"success": True, "status": request.status}
+
+@router.delete("/api/applications/{application_id}")
+async def delete_application(application_id: str, current_user_id: str = Depends(get_current_user)):
+    db = get_db()
+    query = {"user_id": current_user_id}
+    try:
+        query["_id"] = ObjectId(application_id)
+    except Exception:
+        query["company_id"] = application_id
+        
+    result = await db.applications.delete_one(query)
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return {"success": True, "message": "Application deleted successfully"}
+
+@router.post("/api/applications/check-replies")
+async def check_replies_endpoint(current_user_id: str = Depends(get_current_user)):
+    await check_replies_for_user(current_user_id)
+    return {"success": True, "message": "IMAP reply scan completed"}
 

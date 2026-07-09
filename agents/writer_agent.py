@@ -13,7 +13,7 @@ class WriterAgent:
         self.llm, self.provider = get_llm(user_settings)
 
 
-    def write(self, company: dict, resume_summary: str, tailored_resume: str, company_description: str = "") -> dict:
+    def write(self, company: dict, resume_summary: str, tailored_resume: str, company_description: str = "", custom_instructions: str = None, candidate_name: str = None) -> dict:
         """
         Generates application materials (Cover Letter, Email Body, Subject) using an LLM.
         Returns a dict containing the parsed response.
@@ -27,6 +27,9 @@ class WriterAgent:
         job_desc_capped = (job_desc or "")[:600]
         company_description_val = (company_description or company.get("company_description", ""))[:300]
         
+        custom_instructions_block = f"\nUSER CUSTOM INSTRUCTIONS:\n{custom_instructions}\n(FOLLOW THESE INSTRUCTIONS ABOVE ALL ELSE)\n" if custom_instructions else ""
+        name_instruction = f"\nAPPLICANT REAL NAME: {candidate_name}\n(You MUST sign off with this name, e.g. 'Best,\\n{candidate_name}', and use it in subject lines/placeholders)\n" if candidate_name else ""
+
         prompt = (
             f"You are a sharp, no-nonsense job application ghostwriter. "
             f"Return ONLY a valid JSON object with keys: cover_letter, email_subject, email_body. "
@@ -36,11 +39,14 @@ class WriterAgent:
             f"- 3 short paragraphs. Total 150–220 words. No fluff.\n"
             f"- Paragraph 1: Open with something specific about the COMPANY — a product, mission, or recent news from the company description. Show you did your homework. Transition into why this role caught your eye.\n"
             f"- Paragraph 2: Pick ONE concrete achievement from the RESUME that directly maps to a requirement in the JOB DESCRIPTION. Use numbers if the resume has them. Then briefly connect a second JD requirement to another resume skill.\n"
-            f"- Paragraph 3: A confident but not arrogant call to action. Suggest a brief call. Sign off with the applicant's real name (extract it from the resume context — look for the first line or a name-like string).\n"
+            f"- Paragraph 3: A confident but not arrogant call to action. Suggest a brief call. Sign off with the applicant's real name ({candidate_name or 'extract it from the resume context — look for the first line or a name-like string'}).\n"
             f"- Format: Use '\\n\\n' between paragraphs. Start with 'Dear [Company] Team,' or 'Dear Hiring Team at [Company],'. End with 'Best,\\n[Name]'.\n"
             f"- NEVER invent roles, companies, metrics, or skills not in the resume.\n"
             f"- NEVER use these words: leverage, passionate, synergy, dynamic, results-driven, cutting-edge, innovative, thrilled, excited, eager, utilize, spearhead, rockstar, ninja, guru, go-getter.\n"
             f"- Write like a real human — short sentences, active voice, no corporate jargon.\n\n"
+            
+            f"{custom_instructions_block}"
+            f"{name_instruction}"
 
             f"EMAIL SUBJECT RULES:\n"
             f"- Under 10 words. Include the role name. No emojis.\n"

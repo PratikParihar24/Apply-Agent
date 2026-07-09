@@ -12,6 +12,7 @@ from api.routes.hunt import router as hunt_router, resume_processor
 from api.routes.resume import router as resume_router
 from api.routes.community import router as community_router
 from api.routes.settings import router as settings_router
+from api.routes.analytics import router as analytics_router
 app = FastAPI()
 
 app.add_middleware(
@@ -34,6 +35,7 @@ app.include_router(hunt_router)
 app.include_router(resume_router)
 app.include_router(community_router)
 app.include_router(settings_router)
+app.include_router(analytics_router)
 
 @app.get("/api/status")
 async def get_status():

@@ -1,7 +1,9 @@
 import os
 import base64
+import re
 import resend
 from dotenv import load_dotenv
+from fpdf import FPDF
 
 env_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env'))
 load_dotenv(env_path)
@@ -38,22 +40,19 @@ class SendingAgent:
                 r_pdf_bytes = f.read()
         except FileNotFoundError:
             return {"success": False, "message": "Original resume not found. Please re-upload your resume."}
-            
-        # Convert cover letter to HTML paragraphs
-        paragraphs = [p.strip() for p in cover_letter.split("\n") if p.strip()]
-        if paragraphs:
-            # Bold the last line, assuming it's the sign-off name
-            if len(paragraphs[-1]) < 60:
-                paragraphs[-1] = f"<strong>{paragraphs[-1]}</strong>"
-                
-        cl_paragraphs = "".join([f"<p>{p}</p>" for p in paragraphs])
+
+        # Build HTML Email from cover_letter (primary) or email_body (fallback)
+        eb_html = cover_letter or email_body or ""
+        if not eb_html:
+            eb_html = "<p>Please find my resume attached. I look forward to hearing from you.</p>"
+        elif not (eb_html.startswith("<") or eb_html.startswith("<p>")):
+            paragraphs = [p.strip() for p in eb_html.split("\n") if p.strip()]
+            eb_html = "".join([f"<p>{p}</p>" for p in paragraphs])
         
-        # Build HTML Email
         html_body = f"""
         <html>
           <body style="font-family: Arial, Georgia, sans-serif; background-color: #ffffff; padding: 20px; max-width: 600px; margin: 0 auto; color: #333333; line-height: 1.6;">
-            {cl_paragraphs}
-            <p style="margin-top: 20px;">Please find my resume attached. I look forward to hearing from you.</p>
+            {eb_html}
           </body>
         </html>
         """
