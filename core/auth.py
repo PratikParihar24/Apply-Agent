@@ -6,7 +6,8 @@ from config.settings import JWT_SECRET, JWT_EXPIRE_HOURS
 
 def hash_password(password: str) -> str:
     pwd_bytes = password.encode('utf-8')
-    salt = bcrypt.gensalt()
+    # Set rounds to 10 to optimize performance on CPU-constrained servers (4x faster than default 12)
+    salt = bcrypt.gensalt(rounds=10)
     hashed = bcrypt.hashpw(pwd_bytes, salt)
     return hashed.decode('utf-8')
 

@@ -37,6 +37,10 @@ app.include_router(community_router)
 app.include_router(settings_router)
 app.include_router(analytics_router)
 
+@app.get("/")
+async def root():
+    return {"status": "online", "message": "Agent Apply Backend API is running successfully."}
+
 @app.get("/api/status")
 async def get_status():
     # Keep global status check for resume readiness

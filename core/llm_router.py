@@ -21,6 +21,10 @@ def get_llm(user_settings: dict = None):
         if base_url and not base_url.startswith("http"):
             base_url = "http://" + base_url
             
+        # Skip checking localhost Ollama when deployed to the cloud (Render) to prevent blocking timeouts
+        if "RENDER" in os.environ and ("localhost" in base_url or "127.0.0.1" in base_url):
+            return None
+            
         try:
             # Lightweight ping to see if Ollama is actually running locally
             requests.get(base_url, timeout=2)
@@ -110,14 +114,17 @@ def get_active_llm_info(user_settings: dict = None) -> dict:
     
     ollama_available = False
     ollama_models = []
-    try:
-        r = requests.get(f"{ollama_url}/api/tags", timeout=2)
-        if r.status_code == 200:
-            ollama_available = True
-            data = r.json()
-            ollama_models = [m["name"] for m in data.get("models", [])]
-    except:
-        pass
+    
+    # Skip checking localhost Ollama when deployed to the cloud (Render) to prevent blocking timeouts
+    if not ("RENDER" in os.environ and ("localhost" in ollama_url or "127.0.0.1" in ollama_url)):
+        try:
+            r = requests.get(f"{ollama_url}/api/tags", timeout=2)
+            if r.status_code == 200:
+                ollama_available = True
+                data = r.json()
+                ollama_models = [m["name"] for m in data.get("models", [])]
+        except:
+            pass
         
     # Check Gemini
     gemini_key = decrypt(settings.get("gemini_api_key")) if settings.get("gemini_api_key") else None
