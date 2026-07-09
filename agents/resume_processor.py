@@ -225,6 +225,93 @@ class ResumeProcessor:
                 
         return formatted_results
 
+    def query_multi(self, job_description: str, top_k: int = 5) -> list[dict]:
+        """
+        Extracts 3-5 key requirements from the JD using LLM, queries ChromaDB per requirement,
+        merges, deduplicates, and returns top_k unique chunks.
+        """
+        from core.llm_router import get_llm
+        import json
+        
+        requirements = []
+        try:
+            llm, provider = get_llm()
+            prompt = (
+                f"Given this job description, extract exactly 3-5 specific technical or experience requirements "
+                f"as a JSON array of short strings (under 15 words each). Return ONLY the JSON array, nothing else.\n\n"
+                f"Job Description: {job_description}"
+            )
+            response = llm.invoke(prompt)
+            raw_response = response.content.strip()
+            
+            # strip markdown fences with regex
+            cleaned = re.sub(r'^```[a-zA-Z]*\n', '', raw_response)
+            cleaned = re.sub(r'\n```$', '', cleaned)
+            cleaned = cleaned.strip()
+            
+            # extract JSON block
+            match = re.search(r'\[.*\]', cleaned, re.DOTALL)
+            if match:
+                cleaned = match.group(0)
+                
+            requirements = json.loads(cleaned)
+            if not isinstance(requirements, list):
+                requirements = []
+        except Exception as e:
+            print(f"Warning: Failed to extract requirements using LLM: {e}")
+            requirements = []
+
+        # Fallback to chunking the JD if JSON parse or extraction fails
+        if not requirements or not isinstance(requirements, list):
+            print("Falling back to chunk-based queries...")
+            words = job_description.split()
+            if len(words) > 0:
+                chunk_len = max(1, len(words) // 3)
+                requirements = [
+                    " ".join(words[i:i+chunk_len])
+                    for i in range(0, len(words), chunk_len)
+                ][:3]
+            else:
+                requirements = [job_description]
+
+        results = []
+        for req in requirements:
+            if not req.strip():
+                continue
+            try:
+                req_embedding = embed_text(req)
+                res = self.collection.query(
+                    query_embeddings=[req_embedding],
+                    n_results=3
+                )
+                if res and "documents" in res and res["documents"] and res["documents"][0]:
+                    docs = res["documents"][0]
+                    metas = res["metadatas"][0]
+                    dists = res["distances"][0] if "distances" in res and res["distances"] else [0.0] * len(docs)
+                    
+                    for doc, meta, dist in zip(docs, metas, dists):
+                        results.append({
+                            "text": doc,
+                            "section": meta.get("section", "Unknown"),
+                            "score": dist
+                        })
+            except Exception as e:
+                print(f"Warning: Query failed for requirement '{req}': {e}")
+
+        # Merge and deduplicate by exact chunk text
+        seen_texts = set()
+        unique_results = []
+        for r in results:
+            text_cleaned = r["text"].strip().lower()
+            if text_cleaned not in seen_texts:
+                seen_texts.add(text_cleaned)
+                unique_results.append(r)
+
+        # Sort by distance score (lower is more similar)
+        unique_results.sort(key=lambda x: x["score"])
+
+        return unique_results[:top_k]
+
     def is_ready(self) -> bool:
         """Checks if ChromaDB collection exists and has documents."""
         try:

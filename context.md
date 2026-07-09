@@ -128,19 +128,22 @@ Agent-apply/
 - **`settings.py`**: User configuration routes to get and update encrypted API keys and LLM preferences (`GET /api/settings`, `PUT /api/settings`, `DELETE /api/settings/field/{field_name}`).
 
 ### 8. `agents/resume_processor.py`
-**Purpose**: Parses resumes (PDF), cleans text, chunks into semantic pieces, embeds them, and stores them in ChromaDB.
+**Purpose**: Parses resumes (PDF), cleans text, chunks into semantic pieces, embeds them, and stores them in ChromaDB. Supports standard vector queries and `query_multi()` (LLM-driven 3-5 sub-requirements query strategy).
 
 ### 9. `agents/search_agent.py`
-**Purpose**: Uses DuckDuckGo search (DDGS) to find target companies directly online based on role and location.
+**Purpose**: Uses Google CSE -> Bing -> DuckDuckGo Search fallback with surgical query templates to discover non-blocklisted cold outreach target opportunities.
+
+### 9b. `agents/job_listing_agent.py`
+**Purpose**: Discovers live job listings by parsing parallel RSS feeds (Indeed, LinkedIn, Wellfound) and scraping fallbacks (Naukri, Glassdoor).
 
 ### 10. `agents/shortlister_agent.py`
-**Purpose**: Evaluates and scores the fit between the parsed resume summary and scraped job descriptions.
+**Purpose**: Evaluates and scores the fit between the parsed resume summary and scraped job descriptions, incorporating domain/career subdomain and email presence score boosts.
 
 ### 11. `agents/tailor_agent.py`
-**Purpose**: Retrieves relevant resume chunks using `resume_processor` and dynamically organizes them. Accepts `user_settings` on initialization to pass to the LLM router.
+**Purpose**: Retrieves relevant resume chunks using `resume_processor`'s `query_multi()` strategy and dynamically organizes/rephrases them. Accepts `user_settings` on initialization to pass to the LLM router.
 
 ### 12. `agents/writer_agent.py`
-**Purpose**: Uses the LLM Router to author the final job application materials (Cover Letter, Email Body, Email Subject). Injects user's name override and records the `llm_provider` name.
+**Purpose**: Uses the LLM Router to author the final job application materials (Cover Letter, Email Body, Email Subject) adhering to specific tone styles (Casual, Formal, Assertive), company description facts, strict word limits, and banned phrase filtering. Injects user's name override and records the `llm_provider` name.
 
 ### 13. `agents/sending_agent.py`
 **Purpose**: Dispatches applications via **Resend API**. Sends the cover letter text directly as the primary email body and attaches the user's active resume.
@@ -148,6 +151,7 @@ Agent-apply/
 ### 14. `utils/`
 - **`encryption.py`**: Uses `cryptography.fernet` to symmetrically encrypt/decrypt sensitive settings.
 - **`imap_monitor.py`**: Scans user's Gmail box for replies using IMAP. Matches mail headers (`In-Reply-To`/`References`) with application `message_id`s, and transitions matches to `"replied"` status.
+- **`enrichment.py`**: Auto-enriches discovered companies with their official website, HR emails, careers page URL, and company descriptions asynchronously.
 
 ---
 

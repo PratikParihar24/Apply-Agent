@@ -18,10 +18,12 @@ from core.database import get_db
 from core.auth import get_current_user
 from agents.resume_processor import ResumeProcessor
 from agents.search_agent import SearchAgent
+from agents.job_listing_agent import JobListingAgent
 from agents.tailor_agent import TailorAgent
 from agents.writer_agent import WriterAgent
 from agents.sending_agent import SendingAgent
 from utils.imap_monitor import check_replies_for_user
+from utils.enrichment import enrich_company
 
 router = APIRouter(tags=["hunt"])
 
@@ -33,6 +35,10 @@ class SearchRequest(BaseModel):
     role: str
     location: str
     max_results: int
+    mode: Optional[str] = "job_listings"
+    company_size: Optional[str] = "any"
+    company_type: Optional[str] = "any"
+    writing_style: Optional[str] = "casual"
 
 class SendRequest(BaseModel):
     cover_letter: str
@@ -41,10 +47,34 @@ class SendRequest(BaseModel):
     tailored_resume: str
     recipient_email: str
 
+@router.get("/api/hunt/preferences")
+async def get_hunt_preferences(current_user_id: str = Depends(get_current_user)):
+    db = get_db()
+    user = await db.users.find_one({"_id": ObjectId(current_user_id)})
+    if user and "hunt_preferences" in user:
+        # Convert any potential ObjectID to string if inside (but it should be clean json)
+        return user["hunt_preferences"]
+    return {}
+
 @router.post("/api/hunt/start")
 async def start_hunt(request: SearchRequest, current_user_id: str = Depends(get_current_user)):
     db = get_db()
     main_loop = asyncio.get_running_loop()
+    
+    # Save the full hunt parameters to the user's MongoDB document
+    preferences = {
+        "role": request.role,
+        "location": request.location,
+        "company_size": request.company_size,
+        "company_type": request.company_type,
+        "mode": request.mode,
+        "writing_style": request.writing_style,
+        "max_results": request.max_results
+    }
+    await db.users.update_one(
+        {"_id": ObjectId(current_user_id)},
+        {"$set": {"hunt_preferences": preferences}}
+    )
     
     # Fetch active resume to get the summary
     resume = await db.resumes.find_one({"user_id": current_user_id, "is_active": True})
@@ -58,6 +88,11 @@ async def start_hunt(request: SearchRequest, current_user_id: str = Depends(get_
         "user_id": current_user_id,
         "role": request.role,
         "location": request.location,
+        "mode": request.mode,
+        "company_size": request.company_size,
+        "company_type": request.company_type,
+        "writing_style": request.writing_style,
+        "max_results": request.max_results,
         "status": "started",
         "created_at": datetime.utcnow()
     }
@@ -65,7 +100,6 @@ async def start_hunt(request: SearchRequest, current_user_id: str = Depends(get_
     hunt_id = str(result.inserted_id)
     
     def background_search():
-        search_agent = SearchAgent()
         count = 0
         
         def run_db_call(coro):
@@ -103,14 +137,61 @@ async def start_hunt(request: SearchRequest, current_user_id: str = Depends(get_
                     "source": company.get("source"),
                     "score": company.get("score"),
                     "fit_explanation": company.get("fit_explanation"),
-                    "status": "ready"
+                    "status": "ready",
+                    "type": company.get("type", "job_listing" if request.mode == "job_listings" else "cold_outreach")
                 }))
                 
                 hunt_queues[job_id].put(company)
                 count += 1
+
+                # Start background enrichment without blocking the stream
+                def run_enrichment(comp_dict, comp_id):
+                    try:
+                        enriched = enrich_company(comp_dict)
+                        # Save enriched fields to MongoDB
+                        async def update_db_company():
+                            await db.companies.update_one(
+                                {"_id": comp_id},
+                                {"$set": {
+                                    "website": enriched.get("website", ""),
+                                    "hr_email": enriched.get("hr_email", ""),
+                                    "career_page": enriched.get("career_page", ""),
+                                    "company_description": enriched.get("company_description", "")
+                                }}
+                            )
+                        run_db_call(update_db_company())
+                        
+                        # Emit SSE event only if any enrichment found
+                        if (enriched.get("website") or enriched.get("hr_email") or 
+                            enriched.get("career_page") or enriched.get("company_description")):
+                            enrich_event = {
+                                "event": "company_enriched",
+                                "company_id": comp_id,
+                                "website": enriched.get("website", ""),
+                                "hr_email": enriched.get("hr_email", ""),
+                                "career_page": enriched.get("career_page", ""),
+                                "company_description": enriched.get("company_description", "")
+                            }
+                            hunt_queues[job_id].put(enrich_event)
+                    except Exception as ex:
+                        print(f"Error in background enrichment: {ex}")
+
+                threading.Thread(target=run_enrichment, args=(company.copy(), company_id)).start()
                 
         try:
-            search_agent.search_stream(request.role, request.location, resume_summary_text, on_result)
+            if request.mode == "job_listings":
+                listing_agent = JobListingAgent()
+                listing_agent.search_stream(request.role, request.location, resume_summary_text, on_result)
+            else:
+                search_agent = SearchAgent()
+                search_agent.search_stream(
+                    request.role, 
+                    request.location, 
+                    resume_summary_text, 
+                    on_result, 
+                    company_type=request.company_type, 
+                    company_size=request.company_size
+                )
         except Exception as e:
             print(f"Background search error: {e}")
         finally:
@@ -189,9 +270,27 @@ async def generate_materials(company_id: str, request: GenerateRequest = None, c
     
     writer_agent = WriterAgent(user_settings)
     
+    # Retrieve writing style from the associated hunt session
+    writing_style = "casual"
+    if company.get("hunt_id"):
+        try:
+            hunt_session = await db.hunt_sessions.find_one({"_id": ObjectId(company["hunt_id"])})
+            if hunt_session:
+                writing_style = hunt_session.get("writing_style", "casual")
+        except Exception as e:
+            print(f"Warning: Failed to fetch hunt session for writing style: {e}")
+
     custom_inst = request.custom_instructions if request else None
     
-    result = writer_agent.write(company, resume_summary_text, tailored_resume, company_description=company_description, custom_instructions=custom_inst, candidate_name=candidate_name)
+    result = writer_agent.write(
+        company, 
+        resume_summary_text, 
+        tailored_resume, 
+        company_description=company_description, 
+        custom_instructions=custom_inst, 
+        candidate_name=candidate_name,
+        writing_style=writing_style
+    )
     
     cover_letter = result.get("cover_letter", "")
     email_body = result.get("email_body", "")

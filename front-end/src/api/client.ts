@@ -15,12 +15,36 @@ export const uploadResume = async (file: File): Promise<any> => {
     });
 };
 
-export const startHunt = async (role: string, location: string, maxResults: number, onCompany?: (company: any) => void, onDone?: () => void): Promise<any> => {
+export const getHuntPreferences = async (): Promise<any> => {
+    if (USE_MOCK) return {};
+    return apiCall("/api/hunt/preferences", {
+        method: "GET"
+    });
+};
+
+export const startHunt = async (
+    role: string, 
+    location: string, 
+    maxResults: number, 
+    options?: {
+        mode?: string;
+        company_size?: string;
+        company_type?: string;
+        writing_style?: string;
+    },
+    onCompany?: (company: any) => void, 
+    onDone?: () => void
+): Promise<any> => {
     if (USE_MOCK) return mockClient.startHunt(role, location, maxResults, onCompany);
 
     const { job_id, hunt_id } = await apiCall("/api/hunt/start", {
         method: "POST",
-        body: JSON.stringify({ role, location, max_results: maxResults })
+        body: JSON.stringify({ 
+            role, 
+            location, 
+            max_results: maxResults, 
+            ...options 
+        })
     });
     
     // For EventSource, pass token in query parameter since custom headers are not supported natively

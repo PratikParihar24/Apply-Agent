@@ -448,6 +448,8 @@ function RootComponent() {
             <Toaster
               theme="dark"
               position="top-right"
+              expand={true}
+              visibleToasts={6}
               toastOptions={{
                 style: {
                   background: "var(--color-cardbg)",

@@ -7,6 +7,8 @@ import {
   startHunt,
   generateForCompany,
   sendApplication,
+  getHuntPreferences,
+  getActiveResume,
 } from "../api/client";
 import ProtectedRoute from "../components/ProtectedRoute";
 import { useAuth } from "../context/AuthContext";
@@ -66,6 +68,7 @@ interface Company {
   hr_email?: string | null;
   apply_url?: string;
   source?: string;
+  career_page?: string | null;
 }
 
 interface Card extends Company {
@@ -87,6 +90,10 @@ interface HuntBrief {
   salaryMin: string;
   keywords: string;
   notes: string;
+  mode: string;
+  companySize: string;
+  companyType: string;
+  writingStyle: string;
 }
 
 const emptyBrief: HuntBrief = {
@@ -98,6 +105,10 @@ const emptyBrief: HuntBrief = {
   salaryMin: "",
   keywords: "",
   notes: "",
+  mode: "job_listings",
+  companySize: "any",
+  companyType: "any",
+  writingStyle: "casual",
 };
 
 function HuntPage() {
@@ -110,6 +121,34 @@ function HuntPage() {
       location: isClient ? localStorage.getItem('agentapply_hunt_location') || "" : "",
     };
   });
+
+  useEffect(() => {
+    // Load active resume on mount
+    getActiveResume()
+      .then((res) => {
+        if (res && res.filename) {
+          setBrief((prev) => ({ ...prev, resumeName: res.filename }));
+        }
+      })
+      .catch((e) => console.error("Failed to load active resume:", e));
+
+    // Load saved preferences on mount
+    getHuntPreferences()
+      .then((prefs) => {
+        if (prefs && Object.keys(prefs).length > 0) {
+          setBrief((prev) => ({
+            ...prev,
+            targetRole: prefs.role || prev.targetRole,
+            location: prefs.location || prev.location,
+            mode: prefs.mode || prev.mode,
+            companySize: prefs.company_size || prev.companySize,
+            companyType: prefs.company_type || prev.companyType,
+            writingStyle: prefs.writing_style || prev.writingStyle,
+          }));
+        }
+      })
+      .catch((e) => console.error("Failed to load preferences:", e));
+  }, []);
 
   useEffect(() => {
     if (user?.preferences) {
@@ -246,27 +285,60 @@ function HuntPage() {
     if (isStarting) return;
     setIsStarting(true);
     try {
-      const res = await startHunt(brief.targetRole, brief.location || "Remote", 10, (c) => {
-        setCards((prev) => {
-          if (prev.some((existing) => String(existing.id) === String(c.id))) return prev;
-          return [
-            ...prev,
-            {
-              ...c,
-              status: "searching",
-              coverLetter: "",
-              emailBody: "",
-              resume: "",
-              role: c.job_title || c.role || "",
-              desc: c.description || c.desc || "",
-            },
-          ];
-        });
-      });
+      const res = await startHunt(
+        brief.targetRole,
+        brief.location || "Remote",
+        10,
+        {
+          mode: brief.mode,
+          company_size: brief.companySize,
+          company_type: brief.companyType,
+          writing_style: brief.writingStyle,
+        },
+        (c) => {
+          if (c.event === "company_enriched") {
+            setCards((prev) =>
+              prev.map((card) =>
+                String(card.id) === String(c.company_id)
+                  ? {
+                      ...card,
+                      website: c.website || card.website,
+                      hr_email: c.hr_email || card.hr_email,
+                      career_page: c.career_page || card.career_page,
+                      description: c.company_description || card.description,
+                      desc: c.company_description || card.desc,
+                    }
+                  : card
+              )
+            );
+            return;
+          }
+          setCards((prev) => {
+            if (prev.some((existing) => String(existing.id) === String(c.id))) return prev;
+            return [
+              ...prev,
+              {
+                ...c,
+                status: "searching",
+                coverLetter: "",
+                emailBody: "",
+                resume: "",
+                role: c.job_title || c.role || "",
+                desc: c.description || c.desc || "",
+              },
+            ];
+          });
+        }
+      );
       
       // Page navigates/transitions to hunt dashboard immediately after getting job_id
       setStarted(true);
       toast.success(`Hunt started! Job ID: ${res.job_id}`);
+      
+      // Save indicator
+      setTimeout(() => {
+        toast.success("Preferences saved", { duration: 2000 });
+      }, 200);
     } catch (error) {
       const e = error as Error;
       toast.error(`Hunt failed to start: ${e.message}`);
@@ -518,13 +590,44 @@ function SetupForm({
           </label>
         </div>
 
+        {/* Mode Toggle */}
+        <div>
+          <Label>Hunt Mode</Label>
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              type="button"
+              onClick={() => set("mode", "job_listings")}
+              className={`rounded-card py-4 px-6 text-sm font-bold flex flex-col items-center justify-center border transition-all duration-200 btn-ripple ${
+                brief.mode === "job_listings"
+                  ? "bg-terracotta/10 border-terracotta text-terracotta shadow-[var(--shadow-glow)]"
+                  : "bg-darkbg border-cardborder text-mutedtext hover:text-cream hover:border-cream/40"
+              }`}
+            >
+              <span className="text-xl mb-1">🔍</span>
+              <span>Find Job Listings</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => set("mode", "cold_outreach")}
+              className={`rounded-card py-4 px-6 text-sm font-bold flex flex-col items-center justify-center border transition-all duration-200 btn-ripple ${
+                brief.mode === "cold_outreach"
+                  ? "bg-terracotta/10 border-terracotta text-terracotta shadow-[var(--shadow-glow)]"
+                  : "bg-darkbg border-cardborder text-mutedtext hover:text-cream hover:border-cream/40"
+              }`}
+            >
+              <span className="text-xl mb-1">🏢</span>
+              <span>Cold Outreach</span>
+            </button>
+          </div>
+        </div>
+
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <Label>Target role</Label>
             <Input
               value={brief.targetRole}
               onChange={(v) => set("targetRole", v)}
-              placeholder="Senior Product Designer"
+              placeholder="Full Stack Developer"
             />
           </div>
           <div>
@@ -540,7 +643,7 @@ function SetupForm({
             <Input
               value={brief.location}
               onChange={(v) => set("location", v)}
-              placeholder="Berlin, EU, or Remote"
+              placeholder="Bangalore, Mumbai, or Remote"
             />
           </div>
           <div>
@@ -556,8 +659,9 @@ function SetupForm({
             <Input
               value={brief.salaryMin}
               onChange={(v) => set("salaryMin", v)}
-              placeholder="€80,000"
+              placeholder="₹6,00,000"
             />
+            <p className="mt-1 text-xs text-mutedtext">Salary in INR (e.g. ₹6,00,000 per annum)</p>
           </div>
           <div>
             <Label>Keywords / skills</Label>
@@ -566,6 +670,50 @@ function SetupForm({
               onChange={(v) => set("keywords", v)}
               placeholder="design systems, Figma, React"
             />
+          </div>
+          <div>
+            <Label>Company Size (optional)</Label>
+            <select
+              value={brief.companySize}
+              onChange={(e) => set("companySize", e.target.value)}
+              className="w-full appearance-none rounded-card border border-cardborder bg-darkbg px-4 py-3 text-sm text-cream focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/40"
+            >
+              <option value="any">Any</option>
+              <option value="startup">Startup (1-50)</option>
+              <option value="mid">Mid-size (50-500)</option>
+              <option value="enterprise">Enterprise (500+)</option>
+            </select>
+          </div>
+          <div>
+            <Label>Company Type (optional)</Label>
+            <select
+              value={brief.companyType}
+              onChange={(e) => set("companyType", e.target.value)}
+              className="w-full appearance-none rounded-card border border-cardborder bg-darkbg px-4 py-3 text-sm text-cream focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/40"
+            >
+              <option value="any">Any</option>
+              <option value="product">Product</option>
+              <option value="service">Service</option>
+              <option value="startup">Startup</option>
+              <option value="mnc">MNC</option>
+            </select>
+          </div>
+          <div className="sm:col-span-2">
+            <Label>Writing Style</Label>
+            <select
+              value={brief.writingStyle}
+              onChange={(e) => set("writingStyle", e.target.value)}
+              className="w-full appearance-none rounded-card border border-cardborder bg-darkbg px-4 py-3 text-sm text-cream focus:border-terracotta focus:outline-none focus:ring-2 focus:ring-terracotta/40"
+            >
+              <option value="casual">Casual</option>
+              <option value="formal">Formal</option>
+              <option value="assertive">Assertive</option>
+            </select>
+            <p className="mt-1.5 text-xs text-mutedtext italic">
+              {brief.writingStyle === "casual" && "Casual: Friendly and direct — reads like a human wrote it"}
+              {brief.writingStyle === "formal" && "Formal: Professional and structured — suits corporate roles"}
+              {brief.writingStyle === "assertive" && "Assertive: Confident and bold — leads with achievements"}
+            </p>
           </div>
         </div>
 

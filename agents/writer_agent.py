@@ -13,7 +13,7 @@ class WriterAgent:
         self.llm, self.provider = get_llm(user_settings)
 
 
-    def write(self, company: dict, resume_summary: str, tailored_resume: str, company_description: str = "", custom_instructions: str = None, candidate_name: str = None) -> dict:
+    def write(self, company: dict, resume_summary: str, tailored_resume: str, company_description: str = "", custom_instructions: str = None, candidate_name: str = None, writing_style: str = "casual") -> dict:
         """
         Generates application materials (Cover Letter, Email Body, Subject) using an LLM.
         Returns a dict containing the parsed response.
@@ -22,49 +22,65 @@ class WriterAgent:
         company_name = company.get("company", "Unknown Company")
         job_desc = company.get("description", "")
         
-        # Cap tailored_resume to 3000 chars and job_description to 600 chars
+        # Cap tailored_resume to 3000 chars, job_description to 800 chars, company_description to 300 chars
         tailored_resume_capped = (tailored_resume or "")[:3000]
-        job_desc_capped = (job_desc or "")[:600]
+        job_desc_capped = (job_desc or "")[:800]
         company_description_val = (company_description or company.get("company_description", ""))[:300]
-        
-        custom_instructions_block = f"\nUSER CUSTOM INSTRUCTIONS:\n{custom_instructions}\n(FOLLOW THESE INSTRUCTIONS ABOVE ALL ELSE)\n" if custom_instructions else ""
-        name_instruction = f"\nAPPLICANT REAL NAME: {candidate_name}\n(You MUST sign off with this name, e.g. 'Best,\\n{candidate_name}', and use it in subject lines/placeholders)\n" if candidate_name else ""
+
+        STYLE_INSTRUCTIONS = {
+            "casual": """
+Tone: Write like a smart, confident human — not a robot. Use contractions (I've, I'm, you'll).
+Vary sentence length. One short punchy sentence per paragraph minimum.
+Avoid: leverage, synergy, passionate, results-driven, detail-oriented, dynamic.
+Sound like you're talking to a person, not submitting a form.
+""",
+            "formal": """
+Tone: Professional and structured. Full sentences, no contractions.
+Show respect for the company's work. Reference specific aspects of their mission.
+Avoid overly casual language but do not be stiff — confident and respectful.
+""",
+            "assertive": """
+Tone: Bold and direct. Lead every paragraph with an achievement, not an intention.
+Use active voice exclusively. Numbers and metrics whenever available in the resume.
+Do not apologise for gaps or hedge. State what you bring, not what you hope to do.
+"""
+        }
+        style_instructions = STYLE_INSTRUCTIONS.get(writing_style.lower(), STYLE_INSTRUCTIONS["casual"])
 
         prompt = (
-            f"You are a sharp, no-nonsense job application ghostwriter. "
-            f"Return ONLY a valid JSON object with keys: cover_letter, email_subject, email_body. "
-            f"No markdown fences, no explanation, no preamble.\n\n"
-
-            f"COVER LETTER RULES:\n"
-            f"- 3 short paragraphs. Total 150–220 words. No fluff.\n"
-            f"- Paragraph 1: Open with something specific about the COMPANY — a product, mission, or recent news from the company description. Show you did your homework. Transition into why this role caught your eye.\n"
-            f"- Paragraph 2: Pick ONE concrete achievement from the RESUME that directly maps to a requirement in the JOB DESCRIPTION. Use numbers if the resume has them. Then briefly connect a second JD requirement to another resume skill.\n"
-            f"- Paragraph 3: A confident but not arrogant call to action. Suggest a brief call. Sign off with the applicant's real name ({candidate_name or 'extract it from the resume context — look for the first line or a name-like string'}).\n"
-            f"- Format: Use '\\n\\n' between paragraphs. Start with 'Dear [Company] Team,' or 'Dear Hiring Team at [Company],'. End with 'Best,\\n[Name]'.\n"
-            f"- NEVER invent roles, companies, metrics, or skills not in the resume.\n"
-            f"- NEVER use these words: leverage, passionate, synergy, dynamic, results-driven, cutting-edge, innovative, thrilled, excited, eager, utilize, spearhead, rockstar, ninja, guru, go-getter.\n"
-            f"- Write like a real human — short sentences, active voice, no corporate jargon.\n\n"
-            
-            f"{custom_instructions_block}"
-            f"{name_instruction}"
-
-            f"EMAIL SUBJECT RULES:\n"
-            f"- Under 10 words. Include the role name. No emojis.\n"
-            f"- Pattern: 'Application: [Role] — [Name]' or '[Name] — [Role] Application'\n\n"
-
-            f"EMAIL BODY RULES:\n"
-            f"- 3 sentences max. This is the cold-open above the cover letter in the email.\n"
-            f"- Sentence 1: State you are applying for [Role].\n"
-            f"- Sentence 2: One specific achievement from the resume.\n"
-            f"- Sentence 3: 'My resume is attached. Happy to connect at your convenience.'\n"
-            f"- Do NOT mention a cover letter attachment — the cover letter IS the email body.\n\n"
-
+            f"You are a job application writer. Return ONLY a valid JSON object — no markdown, no preamble.\n\n"
+            f"STYLE INSTRUCTIONS:\n"
+            f"{style_instructions}\n\n"
+            f"RULES:\n"
+            f"- Use ONLY skills and experiences present in RESUME CONTEXT. Never invent roles, titles, metrics, or companies.\n"
+            f"- Cover letter: exactly 3 paragraphs, max 200 words total.\n"
+            f"  Para 1: Why this specific company (use COMPANY DESCRIPTION if provided).\n"
+            f"  Para 2: One concrete achievement from the resume that directly matches a JD requirement.\n"
+            f"  Para 3: Call to action — specific, not generic (\"I'd love to connect\" is banned).\n"
+            f"- Address at least 2 specific requirements from the job description.\n"
+            f"- Email subject: under 12 words, include role name, make it specific not generic.\n"
+            f"- Email body: 4 sentences max. Sentence 1: role + where you found it. Sentence 2: one achievement. Sentence 3: why this company. Sentence 4: next step.\n"
+            f"- If COMPANY DESCRIPTION is provided, reference something specific from it in Para 1. Do not make up company info if description is empty.\n"
+            f"- Apply the STYLE INSTRUCTIONS strictly — they override default tone.\n"
+            f"- Banned phrases (never use): \"I am passionate about\", \"leverage\", \"synergy\", \"I would love the opportunity\", \"please find attached\", \"to whom it may concern\", \"I am writing to express\".\n\n"
+            f"FEW-SHOT EXAMPLE (for reference only — do not copy this content):\n"
+            f"{{\n"
+            f"  \"cover_letter\": \"Dear Team at Finstack,\\n\\nYour focus on making financial infrastructure accessible to Indian SMEs is exactly the problem space I've spent the last two years working in. At my last role, I built a payment reconciliation service in Node.js that processed 50,000 transactions daily with zero downtime — the kind of reliability-at-scale challenge your engineering blog describes tackling.\\n\\nI also noticed you need someone comfortable with both system design and rapid prototyping. I've shipped 4 production features solo in the last 6 months, from schema design to deployment.\\n\\nI'd like to set up a 20-minute call this week or next — Tuesday and Thursday afternoons work well for me.\\n\\nBest,\\nAlex\",\n"
+            f"  \"email_subject\": \"Full Stack Application — Alex Kumar, 3 yrs Node.js + React\",\n"
+            f"  \"email_body\": \"Hi, I'm applying for the Full Stack Developer role I found on Wellfound. At Finstack's scale, reliability matters — I built a transaction service handling 50K daily requests with 99.9% uptime. Your focus on SME financial access resonates with work I've done in the same space. I'd welcome a quick call — happy to work around your schedule.\"\n"
+            f"}}\n\n"
             f"RESUME CONTEXT:\n"
             f"{tailored_resume_capped}\n\n"
             f"COMPANY: {company_name}\n"
             f"ROLE: {job_title}\n"
             f"COMPANY DESCRIPTION: {company_description_val}\n"
-            f"JOB DESCRIPTION: {job_desc_capped}"
+            f"JOB DESCRIPTION: {job_desc_capped}\n\n"
+            f"Return ONLY this JSON structure:\n"
+            f"{{\n"
+            f"  \"cover_letter\": \"...\",\n"
+            f"  \"email_subject\": \"...\",\n"
+            f"  \"email_body\": \"...\"\n"
+            f"}}"
         )
         
         raw_response = ""

@@ -17,8 +17,8 @@ class TailorAgent:
         """
         job_desc = company.get("description", "")
         
-        # Get top chunks
-        chunks = resume_processor.query(job_desc, top_k=5)
+        # Get top chunks using multi-query strategy
+        chunks = resume_processor.query_multi(job_desc, top_k=5)
         
         # Deduplicate chunks
         unique_chunks = []

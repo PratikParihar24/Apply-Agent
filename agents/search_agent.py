@@ -287,78 +287,217 @@ class SearchAgent:
                         
         return results
 
-    def search_stream(self, role: str, location: str, resume_summary_text: str, on_result_callback):
+    def _search_google(self, query: str, num: int = 10) -> list[dict]:
+        from config.settings import GOOGLE_CSE_API_KEY, GOOGLE_CSE_ID
+        if not GOOGLE_CSE_API_KEY or not GOOGLE_CSE_ID:
+            print("Google CSE API key or ID not configured.")
+            return []
+        try:
+            url = "https://www.googleapis.com/customsearch/v1"
+            params = {
+                "key": GOOGLE_CSE_API_KEY,
+                "cx": GOOGLE_CSE_ID,
+                "q": query,
+                "num": num,
+                "gl": "in",
+                "hl": "en"
+            }
+            r = requests.get(url, params=params, timeout=5)
+            if r.status_code == 200:
+                items = r.json().get("items", [])
+                return [
+                    {
+                        "title": item.get("title", ""),
+                        "link": item.get("link", ""),
+                        "snippet": item.get("snippet", "")
+                    }
+                    for item in items
+                ]
+            else:
+                print(f"Warning: Google CSE returned status code {r.status_code}")
+        except Exception as e:
+            print(f"Warning: Google CSE failed: {e}")
+        return []
+
+    def _search_bing(self, query: str, num: int = 10) -> list[dict]:
+        from config.settings import BING_SEARCH_API_KEY
+        if not BING_SEARCH_API_KEY:
+            print("Bing Search API key not configured.")
+            return []
+        try:
+            url = "https://api.bing.microsoft.com/v7.0/search"
+            headers = {
+                "Ocp-Apim-Subscription-Key": BING_SEARCH_API_KEY
+            }
+            params = {
+                "q": query,
+                "count": num,
+                "mkt": "en-IN"
+            }
+            r = requests.get(url, headers=headers, params=params, timeout=5)
+            if r.status_code == 200:
+                items = r.json().get("webPages", {}).get("value", [])
+                return [
+                    {
+                        "title": item.get("name", ""),
+                        "link": item.get("url", ""),
+                        "snippet": item.get("snippet", "")
+                    }
+                    for item in items
+                ]
+            else:
+                print(f"Warning: Bing Search returned status code {r.status_code}")
+        except Exception as e:
+            print(f"Warning: Bing Search failed: {e}")
+        return []
+
+    def _unified_search(self, query: str, num: int = 10, location: str = "") -> list[dict]:
+        # Google CSE -> Bing -> DDGS
+        results = self._search_google(query, num)
+        if results:
+            return results
+            
+        results = self._search_bing(query, num)
+        if results:
+            return results
+            
+        print("Falling back to DDGS...")
+        ddgs_query = query
+        if location:
+            ddgs_query += f' site:in OR "{location}"'
+        try:
+            with DDGS() as ddgs:
+                ddgs_res = list(ddgs.text(ddgs_query, max_results=num))
+                return [
+                    {
+                        "title": r.get("title", ""),
+                        "link": r.get("href", ""),
+                        "snippet": r.get("body", "")
+                    }
+                    for r in ddgs_res
+                ]
+        except Exception as e:
+            print(f"Warning: DDGS fallback failed: {e}")
+        return []
+
+    def search_stream(self, role: str, location: str, resume_summary_text: str, on_result_callback, company_type: str = "any", company_size: str = "any"):
         """
-        Runs 6 parallel queries targeting actual companies.
-        As each query yields results, it scores them instantly and calls on_result_callback.
+        Runs parallel queries targeting actual companies with Google CSE -> Bing -> DDGS fallback,
+        surgical outreach queries, blocklist filtering, and score boosts.
         """
         from agents.shortlister_agent import ShortlisterAgent
         import concurrent.futures
         
-        queries = [
-            f'{role} internship {location} company hiring 2025 -site:naukri.com -site:glassdoor.com -site:indeed.com',
-            f'"{role}" opening {location} "apply" OR "careers" OR "we are hiring" -job board',
-            f'startups {location} hiring {role} 2025 site:wellfound.com OR site:linkedin.com/company',
-            f'{role} {location} "send your resume" OR "email your cv" OR "careers@" OR "hr@"',
-            f'"{location}" tech companies hiring "{role}" internship filetype:html',
-            f'{role} fresher internship {location} "contact us" OR "apply now" site:*.in OR site:*.com',
+        COLD_OUTREACH_QUERIES = [
+            'site:careers.* "{role}" "{location}"',
+            '"{role}" "{location}" (inurl:careers OR inurl:jobs) -site:linkedin.com -site:indeed.com -site:naukri.com -site:glassdoor.com',
+            '"we are hiring" OR "join our team" "{role}" "{location}" -site:linkedin.com -site:indeed.com',
+            '"{role}" "{location}" "hr@" OR "careers@" OR "talent@" -site:linkedin.com -site:indeed.com',
+            '"{role}" site:wellfound.com OR site:instahyre.com "{location}"',
+            '"{role}" "{company_type}" "{location}" careers -site:linkedin.com -site:naukri.com',
         ]
-        
+
+        company_type_str = "" if company_type.lower() == "any" else company_type
+        queries = []
+        for q_temp in COLD_OUTREACH_QUERIES:
+            q = q_temp.format(role=role, location=location, company_type=company_type_str)
+            q = re.sub(r'\s+', ' ', q).replace('""', '').strip()
+            queries.append(q)
+
+        BLOCKED_DOMAINS = {
+            "linkedin.com", "indeed.com", "glassdoor.com", "naukri.com",
+            "monster.com", "careerbuilder.com", "ziprecruiter.com",
+            "shine.com", "foundit.in", "timesjobs.com", "freshersworld.com",
+            "instahyre.com", "quora.com", "reddit.com", "medium.com",
+            "dev.to", "hashnode.dev", "towardsdatascience.com",
+            "substack.com", "wordpress.com", "blogger.com", "wikipedia.org"
+        }
+
+        def check_company_size_match(snippet_or_text: str, filter_size: str) -> bool:
+            if not filter_size or filter_size == "any":
+                return False
+            text = snippet_or_text.lower()
+            if filter_size == "startup":
+                return "startup" in text or "1-50" in text or "early-stage" in text
+            elif filter_size == "mid":
+                return "mid-size" in text or "50-500" in text or "growth-stage" in text
+            elif filter_size == "enterprise":
+                return "enterprise" in text or "500+" in text or "fortune 500" in text
+            return False
+            
         seen_companies = set()
         shortlister = ShortlisterAgent()
         
         def _run_query(query: str):
-            attempts = 0
-            max_attempts = 2
-            while attempts < max_attempts:
-                try:
-                    with DDGS() as ddgs:
-                        for r in ddgs.text(query, max_results=5):
-                            url = r.get("href", "")
-                            title = r.get("title", "")
-                            body = r.get("body", "")
+            try:
+                results = self._unified_search(query, num=10, location=location)
+                for r in results:
+                    url = r.get("link", "")
+                    title = r.get("title", "")
+                    body = r.get("snippet", "")
+                    
+                    if not url:
+                        continue
+                        
+                    parsed_url = urlparse(url)
+                    netloc = parsed_url.netloc.lower().replace("www.", "")
+                    is_blocked = False
+                    for bd in BLOCKED_DOMAINS:
+                        if netloc == bd or netloc.endswith("." + bd):
+                            is_blocked = True
+                            break
+                    if is_blocked:
+                        continue
+
+                    # Post-filter: Discard .com domains if snippet does not mention location/india/remote
+                    # Exception: Keep if careers/jobs is in URL
+                    if netloc.endswith(".com") or netloc.endswith(".com/"):
+                        is_career_page = "/careers" in url.lower() or "/jobs" in url.lower()
+                        if not is_career_page:
+                            check_text = f"{title} {body} {location}".lower()
+                            if not any(item in check_text for item in [location.lower(), "india", "remote"]):
+                                continue
+                        
+                    job_title, company = self._parse_title(title)
+                    
+                    # Email extraction
+                    email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', body)
+                    hr_email = email_match.group(0) if email_match else None
+                    
+                    comp_key = company.lower()
+                    if comp_key not in seen_companies and comp_key != "unknown company" and len(comp_key) > 1:
+                        seen_companies.add(comp_key)
+                        
+                        # Bonus scoring
+                        bonus = 0
+                        if "careers." in parsed_url.netloc.lower():
+                            bonus += 3
+                        if "/careers" in parsed_url.path.lower() or "/jobs" in parsed_url.path.lower():
+                            bonus += 2
+                        if hr_email:
+                            bonus += 2
+                        if check_company_size_match(body, company_size):
+                            bonus += 1
                             
-                            job_title, company = self._parse_title(title)
-                            
-                            # Email extraction
-                            email_match = re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', body)
-                            hr_email = email_match.group(0) if email_match else None
-                            
-                            job_boards = ['naukri.com', 'glassdoor.com', 'indeed.com', 'linkedin.com', 'internshala.com', 'wellfound.com', 'monster.com', 'ziprecruiter.com', 'careerbuilder.com']
-                            
-                            comp_key = company.lower()
-                            if comp_key not in seen_companies and comp_key != "unknown company":
-                                seen_companies.add(comp_key)
-                                
-                                # Find website and career page using helper
-                                res_find = self._find_career_page(company)
-                                website_val = res_find.get("career_page") or res_find.get("website") or ""
-                                hr_email_val = res_find.get("hr_email") or hr_email
-                                
-                                job_dict = {
-                                    "company": company,
-                                    "job_title": job_title,
-                                    "website": website_val,
-                                    "career_page": res_find.get("career_page", ""),
-                                    "unverified": not bool(website_val),
-                                    "description": body,
-                                    "company_description": "",  # Exclude from stream loop for performance
-                                    "hr_email": hr_email_val,
-                                    "apply_url": url,
-                                    "source": query
-                                }
-                                
-                                # Score instantly
-                                for scored_company in shortlister.shortlist_stream([job_dict], resume_summary_text):
-                                    on_result_callback(scored_company)
-                                    
-                            time.sleep(random.uniform(0.5, 1.5))
-                    break
-                except Exception as e:
-                    print(f"DDGS Search Exception for '{query}': {e}")
-                    attempts += 1
-                    if attempts < max_attempts:
-                        time.sleep(2)
+                        job_dict = {
+                            "company": company,
+                            "job_title": job_title,
+                            "website": f"{parsed_url.scheme}://{parsed_url.netloc}",
+                            "career_page": url if ("/careers" in url or "/jobs" in url) else "",
+                            "unverified": False,
+                            "description": body,
+                            "company_description": "",
+                            "hr_email": hr_email or "",
+                            "apply_url": url,
+                            "source": "cold_outreach",
+                            "bonus_score": bonus,
+                            "type": "cold_outreach"
+                        }
+                        
+                        for scored_company in shortlister.shortlist_stream([job_dict], resume_summary_text):
+                            on_result_callback(scored_company)
+            except Exception as e:
+                print(f"Exception for search query '{query}': {e}")
 
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as executor:
             futures = [executor.submit(_run_query, q) for q in queries]
@@ -366,11 +505,5 @@ class SearchAgent:
 
 if __name__ == '__main__':
     agent = SearchAgent()
-    print("Searching for 'Machine Learning Engineer jobs in Bangalore India'...")
-    jobs = agent.search("Machine Learning Engineer", "Bangalore India")
-    
-    print(f"\n--- Found {len(jobs)} unique companies ---")
-    for idx, job in enumerate(jobs):
-        print(f"{idx+1}. {job['company']} - {job['job_title']}")
-        print(f"   URL: {job['url']}")
-        print(f"   Desc: {job['description'][:100]}...\n")
+    print("Searching for 'Machine Learning Engineer jobs in Bangalore'...")
+    agent.search_stream("Machine Learning Engineer", "Bangalore", "resume details here", print)

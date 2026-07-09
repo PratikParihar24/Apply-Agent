@@ -12,6 +12,11 @@ GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
 OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL")
 
+# Search API Configuration
+GOOGLE_CSE_API_KEY = os.getenv("GOOGLE_CSE_API_KEY")
+GOOGLE_CSE_ID = os.getenv("GOOGLE_CSE_ID")
+BING_SEARCH_API_KEY = os.getenv("BING_SEARCH_API_KEY")
+
 # Resend Email Configuration
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 RESEND_FROM_ADDRESS = os.getenv("RESEND_FROM_ADDRESS")

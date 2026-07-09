@@ -39,11 +39,11 @@ class ShortlisterAgent:
         scored_companies.sort(key=lambda x: x["score"], reverse=True)
         return scored_companies[:top_n]
 
-    def _quick_score(self, company: dict, resume_summary: str) -> int:
+    def _quick_score(self, company: dict, resume_summary: str, bonus_score: int = 0) -> int:
         text = (company.get('description', '') + ' ' + company.get('job_title', '')).lower()
         keywords = resume_summary.lower().split()[:50]  # first 50 words
         matches = sum(1 for k in keywords if k in text and len(k) > 4)
-        return min(10, max(4, matches))
+        return min(10, max(4, matches)) + bonus_score
 
     def shortlist_stream(self, companies: list[dict], resume_summary: str):
         """
@@ -51,7 +51,8 @@ class ShortlisterAgent:
         """
         print("Shortlisting companies (streaming)...")
         for idx, comp in enumerate(companies):
-            score = self._quick_score(comp, resume_summary)
+            bonus = comp.get("bonus_score", 0)
+            score = self._quick_score(comp, resume_summary, bonus_score=bonus)
             comp_copy = comp.copy()
             comp_copy["score"] = score
             yield comp_copy
