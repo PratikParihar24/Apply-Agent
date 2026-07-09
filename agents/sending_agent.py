@@ -62,7 +62,10 @@ class SendingAgent:
         attachment_filename = "Resume.pdf" if is_pdf else "Resume.docx"
 
         attachments = [
-            {"filename": attachment_filename, "content": list(r_pdf_bytes)}
+            {
+                "filename": attachment_filename,
+                "content": base64.b64encode(r_pdf_bytes).decode('utf-8')
+            }
         ]
 
         try:

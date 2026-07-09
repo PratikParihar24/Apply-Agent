@@ -5,7 +5,7 @@ import { n as useAuth } from "./AuthContext-Dlw7MGTB.mjs";
 import { t as ProtectedRoute } from "./ProtectedRoute-W1osNBCA.mjs";
 import { n as toast } from "../_libs/sonner.mjs";
 import { C as Bold, f as List, p as Italic, t as X } from "../_libs/lucide-react.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/hunt-gUBBZumd.js
+//#region node_modules/.nitro/vite/services/ssr/assets/hunt-eibONViJ.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
 function RichTextEditor({ value, onChange, placeholder, className = "", minHeight = "150px" }) {
@@ -634,7 +634,7 @@ function SetupForm({ brief, setBrief, onStart, onCancel, isStarting = false }) {
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Target role" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
 							value: brief.targetRole,
 							onChange: (v) => set("targetRole", v),
-							placeholder: "Senior Product Designer"
+							placeholder: "Full Stack Developer"
 						})] }),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Seniority" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Select, {
 							value: brief.seniority,
@@ -651,7 +651,7 @@ function SetupForm({ brief, setBrief, onStart, onCancel, isStarting = false }) {
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Location" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
 							value: brief.location,
 							onChange: (v) => set("location", v),
-							placeholder: "Berlin, EU, or Remote"
+							placeholder: "Bangalore, Mumbai, or Remote"
 						})] }),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Work mode" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Select, {
 							value: brief.workMode,
@@ -663,11 +663,18 @@ function SetupForm({ brief, setBrief, onStart, onCancel, isStarting = false }) {
 								"Any"
 							]
 						})] }),
-						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Minimum salary (optional)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
-							value: brief.salaryMin,
-							onChange: (v) => set("salaryMin", v),
-							placeholder: "€80,000"
-						})] }),
+						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Minimum salary (optional)" }),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
+								value: brief.salaryMin,
+								onChange: (v) => set("salaryMin", v),
+								placeholder: "₹6,00,000"
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-1 text-xs text-mutedtext",
+								children: "Salary in INR (e.g. ₹6,00,000 per annum)"
+							})
+						] }),
 						/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Keywords / skills" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
 							value: brief.keywords,
 							onChange: (v) => set("keywords", v),

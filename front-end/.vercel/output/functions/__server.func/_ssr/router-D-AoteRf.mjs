@@ -6,10 +6,10 @@ import { N as useNavigate, P as useRouter, c as HeadContent, d as Outlet, f as l
 import { n as toast, t as Toaster } from "../_libs/sonner.mjs";
 import { D as CircleCheckBig, b as ChevronDown, d as Mail, l as RefreshCw, n as User, o as Settings, r as TrendingUp, s as Server, u as Percent, w as Sparkles, x as Check } from "../_libs/lucide-react.mjs";
 import { n as QueryClient } from "../_libs/tanstack__query-core.mjs";
-//#region node_modules/.nitro/vite/services/ssr/assets/router-BlqHkErQ.js
+//#region node_modules/.nitro/vite/services/ssr/assets/router-D-AoteRf.js
 var import_react = /* @__PURE__ */ __toESM(require_react());
 var import_jsx_runtime = require_jsx_runtime();
-var styles_default = "/assets/styles-clQDLNMv.css";
+var styles_default = "/assets/styles-Bh11ceEQ.css";
 function reportLovableError(error, context = {}) {
 	if (typeof window === "undefined") return;
 	window.__lovableEvents?.captureException?.(error, {
@@ -546,12 +546,6 @@ function Navbar() {
 									children: "Community"
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
-									to: "/profile",
-									className: linkCls,
-									activeProps: { className: activeCls },
-									children: "Profile"
-								}),
-								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Link, {
 									to: "/applications",
 									className: linkCls,
 									activeProps: { className: activeCls },
@@ -568,9 +562,14 @@ function Navbar() {
 								className: "flex items-center gap-4 border-l border-cardborder pl-4",
 								children: user ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 									className: "flex items-center gap-3",
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
-										className: "text-xs font-medium text-cream max-w-[120px] truncate",
-										children: user.name || user.email
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Link, {
+										to: "/profile",
+										className: "flex items-center gap-2 text-xs font-medium text-cream max-w-[150px] truncate hover:text-terracotta transition-colors focus-visible:outline-none",
+										activeProps: { className: "text-terracotta font-semibold" },
+										children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+											className: "flex h-6 w-6 items-center justify-center rounded-full bg-terracotta/20 text-terracotta",
+											children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(User, { size: 12 })
+										}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: user.name || user.email })]
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", {
 										onClick: handleLogout,
 										className: "rounded-card border border-cardborder bg-cardbg px-3 py-1.5 text-xs font-semibold text-terracotta hover:bg-cardbg-hover transition-colors btn-ripple focus-visible:outline-none",
@@ -703,6 +702,8 @@ function RootComponent() {
 				/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Toaster, {
 					theme: "dark",
 					position: "top-right",
+					expand: true,
+					visibleToasts: 6,
 					toastOptions: { style: {
 						background: "var(--color-cardbg)",
 						border: "1px solid var(--color-cardborder)",
@@ -727,7 +728,7 @@ var Route$6 = createFileRoute("/profile")({
 });
 var $$splitComponentImporter$4 = () => import("./login-adUjuzH5.mjs");
 var Route$5 = createFileRoute("/login")({ component: lazyRouteComponent($$splitComponentImporter$4, "component") });
-var $$splitComponentImporter$3 = () => import("./hunt-gUBBZumd.mjs");
+var $$splitComponentImporter$3 = () => import("./hunt-eibONViJ.mjs");
 var Route$4 = createFileRoute("/hunt")({
 	head: () => ({ meta: [{ title: "My Hunt — Agent Apply" }, {
 		name: "description",
