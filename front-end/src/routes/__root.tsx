@@ -318,7 +318,6 @@ function Navbar() {
                   )}
                 </Link>
                 <Link to="/community" className={linkCls} activeProps={{ className: activeCls }}>Community</Link>
-                <Link to="/profile" className={linkCls} activeProps={{ className: activeCls }}>Profile</Link>
                 <Link to="/applications" className={linkCls} activeProps={{ className: activeCls }}>Applications</Link>
                 <Link
                   to="/settings"
@@ -336,7 +335,16 @@ function Navbar() {
             <div className="flex items-center gap-4 border-l border-cardborder pl-4">
               {user ? (
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-medium text-cream max-w-[120px] truncate">{user.name || user.email}</span>
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-2 text-xs font-medium text-cream max-w-[150px] truncate hover:text-terracotta transition-colors focus-visible:outline-none"
+                    activeProps={{ className: "text-terracotta font-semibold" }}
+                  >
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-terracotta/20 text-terracotta">
+                      <UserIcon size={12} />
+                    </div>
+                    <span>{user.name || user.email}</span>
+                  </Link>
                   <button
                     onClick={handleLogout}
                     className="rounded-card border border-cardborder bg-cardbg px-3 py-1.5 text-xs font-semibold text-terracotta hover:bg-cardbg-hover transition-colors btn-ripple focus-visible:outline-none"
