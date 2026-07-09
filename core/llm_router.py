@@ -1,11 +1,32 @@
 import os
 import requests
+import time
 from langchain_ollama import ChatOllama
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
 from config.settings import GEMINI_API_KEY, OLLAMA_BASE_URL, GROQ_API_KEY, OPENROUTER_API_KEY
 from utils.encryption import decrypt
+
+_ollama_status_cache = {}
+
+def check_ollama_cached(url: str, timeout: float = 2.0) -> bool:
+    global _ollama_status_cache
+    now = time.time()
+    cache_entry = _ollama_status_cache.get(url)
+    if cache_entry and (now - cache_entry["last_checked"] < 15.0):
+        return cache_entry["available"]
+        
+    available = False
+    try:
+        r = requests.get(url, timeout=timeout)
+        if r.status_code == 200:
+            available = True
+    except:
+        pass
+        
+    _ollama_status_cache[url] = {"available": available, "last_checked": now}
+    return available
 
 def get_llm(user_settings: dict = None):
     """
@@ -25,12 +46,9 @@ def get_llm(user_settings: dict = None):
         if "RENDER" in os.environ and ("localhost" in base_url or "127.0.0.1" in base_url):
             return None
             
-        try:
-            # Lightweight ping to see if Ollama is actually running locally
-            requests.get(base_url, timeout=2)
+        if check_ollama_cached(base_url):
             return ChatOllama(model="llama3.2:1b", base_url=base_url)
-        except:
-            return None
+        return None
 
     def try_gemini():
         # Use user's personal key if it exists, otherwise fallback to server key
@@ -117,14 +135,15 @@ def get_active_llm_info(user_settings: dict = None) -> dict:
     
     # Skip checking localhost Ollama when deployed to the cloud (Render) to prevent blocking timeouts
     if not ("RENDER" in os.environ and ("localhost" in ollama_url or "127.0.0.1" in ollama_url)):
-        try:
-            r = requests.get(f"{ollama_url}/api/tags", timeout=2)
-            if r.status_code == 200:
-                ollama_available = True
-                data = r.json()
-                ollama_models = [m["name"] for m in data.get("models", [])]
-        except:
-            pass
+        if check_ollama_cached(ollama_url):
+            try:
+                r = requests.get(f"{ollama_url}/api/tags", timeout=2)
+                if r.status_code == 200:
+                    ollama_available = True
+                    data = r.json()
+                    ollama_models = [m["name"] for m in data.get("models", [])]
+            except:
+                pass
         
     # Check Gemini
     gemini_key = decrypt(settings.get("gemini_api_key")) if settings.get("gemini_api_key") else None
