@@ -15,11 +15,18 @@ class Embedder:
         embeddings = self.model.encode(texts)
         return embeddings.tolist()
 
-# Instantiate a default embedder
-_default_embedder = Embedder()
+# Lazy loading of default embedder
+_default_embedder = None
+
+def get_embedder():
+    global _default_embedder
+    if _default_embedder is None:
+        print("Initializing SentenceTransformer model (lazy load)...")
+        _default_embedder = Embedder()
+    return _default_embedder
 
 def embed_text(text: str) -> list[float]:
-    return _default_embedder.embed_text(text)
+    return get_embedder().embed_text(text)
 
 def embed_batch(texts: list[str]) -> list[list[float]]:
-    return _default_embedder.embed_batch(texts)
+    return get_embedder().embed_batch(texts)
