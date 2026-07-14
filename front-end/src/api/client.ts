@@ -1,4 +1,4 @@
-import { apiCall } from "../utils/apiClient";
+import { apiCall, BASE_URL } from "../utils/apiClient";
 import * as mockClient from "./mockClient";
 
 const USE_MOCK = typeof window !== 'undefined' && window.localStorage ? localStorage.getItem('devMode') === 'true' : false;
@@ -49,7 +49,7 @@ export const startHunt = async (
     
     // For EventSource, pass token in query parameter since custom headers are not supported natively
     const token = localStorage.getItem("access_token");
-    const streamUrl = `http://localhost:8000/api/hunt/stream/${job_id}${token ? `?token=${token}` : ''}`;
+    const streamUrl = `${BASE_URL}/api/hunt/stream/${job_id}${token ? `?token=${token}` : ''}`;
     const eventSource = new EventSource(streamUrl);
     
     eventSource.onmessage = (event) => {
