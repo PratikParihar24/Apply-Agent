@@ -73,27 +73,27 @@ async def check_replies_for_user(user_id: str):
             print(f"IMAP Monitor: Found {len(msg_ids)} messages in last 30 days to scan.")
             
             matches = []
-            for msg_id in msg_ids:
-                status, data = mail.fetch(msg_id, "(BODY[HEADER.FIELDS (IN-REPLY-TO REFERENCES)])")
-                if status != "OK" or not data:
-                    continue
-                    
-                raw_header = data[0][1]
-                if not raw_header:
-                    continue
-                    
-                msg = email.message_from_bytes(raw_header)
-                in_reply_to = msg.get("In-Reply-To", "")
-                references = msg.get("References", "")
-                
-                referenced_ids = re.findall(r'<([^>]+)>', in_reply_to + " " + references)
-                for ref_id in referenced_ids:
-                    ref_id_clean = ref_id.strip()
-                    if ref_id_clean in app_map:
-                        matches.append(ref_id_clean)
-                        # Avoid duplicates
-                        break
-                        
+            if msg_ids:
+                # Batch fetch all headers in a single command
+                id_sequence = b",".join(msg_ids).decode('utf-8')
+                status, fetch_data = mail.fetch(id_sequence, "(BODY[HEADER.FIELDS (IN-REPLY-TO REFERENCES)])")
+                if status == "OK" and fetch_data:
+                    for response_part in fetch_data:
+                        if isinstance(response_part, tuple):
+                            raw_header = response_part[1]
+                            if not raw_header:
+                                continue
+                            msg = email.message_from_bytes(raw_header)
+                            in_reply_to = msg.get("In-Reply-To", "") or ""
+                            references = msg.get("References", "") or ""
+                            
+                            referenced_ids = re.findall(r'<([^>]+)>', in_reply_to + " " + references)
+                            for ref_id in referenced_ids:
+                                ref_id_clean = ref_id.strip()
+                                if ref_id_clean in app_map:
+                                    matches.append(ref_id_clean)
+                                    break
+                                    
             mail.close()
             mail.logout()
             return matches
