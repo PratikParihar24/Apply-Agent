@@ -479,6 +479,28 @@ async def get_applications(current_user_id: str = Depends(get_current_user)):
                     h["timestamp"] = h["timestamp"].isoformat()
     return apps
 
+@router.get("/api/applications/cron")
+async def get_applications_cron(current_user_id: str = Depends(get_current_user)):
+    db = get_db()
+    cursor = db.applications.find(
+        {"user_id": current_user_id},
+        {"tailored_resume": 0, "cover_letter": 0, "email_body": 0, "fit_explanation": 0}
+    ).sort("applied_at", -1)
+    apps = await cursor.to_list(length=100)
+    for app in apps:
+        app["_id"] = str(app["_id"])
+        if "applied_at" in app and isinstance(app["applied_at"], datetime):
+            app["applied_at"] = app["applied_at"].isoformat()
+        if "last_updated" in app and isinstance(app["last_updated"], datetime):
+            app["last_updated"] = app["last_updated"].isoformat()
+        if "sent_at" in app and isinstance(app["sent_at"], datetime):
+            app["applied_at"] = app["sent_at"].isoformat()
+        if "status_history" in app:
+            for h in app["status_history"]:
+                if "timestamp" in h and isinstance(h["timestamp"], datetime):
+                    h["timestamp"] = h["timestamp"].isoformat()
+    return apps
+
 @router.put("/api/applications/{company_id}/status")
 async def update_application_status(company_id: str, request: StatusUpdateRequest, current_user_id: str = Depends(get_current_user)):
     valid_statuses = ["applied", "viewed", "replied", "interview", "rejected"]
