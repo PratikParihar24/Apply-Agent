@@ -41,6 +41,10 @@ app.include_router(analytics_router)
 async def root():
     return {"status": "online", "message": "Agent Apply Backend API is running successfully."}
 
+@app.get("/api/cron")
+async def cron_ping():
+    return {"status": "alive", "message": "Keep-alive ping successful"}
+
 @app.get("/api/status")
 async def get_status():
     # Keep global status check for resume readiness
