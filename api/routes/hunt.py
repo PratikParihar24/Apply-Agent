@@ -553,7 +553,7 @@ async def delete_application(application_id: str, current_user_id: str = Depends
         raise HTTPException(status_code=404, detail="Application not found")
     return {"success": True, "message": "Application deleted successfully"}
 
-@router.post("/api/applications/check-replies")
+@router.api_route("/api/applications/check-replies", methods=["GET", "POST"])
 async def check_replies_endpoint(current_user_id: str = Depends(get_current_user)):
     await check_replies_for_user(current_user_id)
     return {"success": True, "message": "IMAP reply scan completed"}
